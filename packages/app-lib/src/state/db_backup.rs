@@ -66,7 +66,9 @@ pub(crate) async fn maybe_backup_existing_app_db(
     }
 
     let stored_version = stored_version.as_deref().unwrap_or("unknown");
-    let backup_dir = match app_db_backup_dir() {
+    let backup_dir = match backup_dir_for_settings(db_path.parent().ok_or_else(|| {
+        crate::ErrorKind::FSError("App database has no parent directory".to_string())
+    })?) {
         Ok(path) => path,
         Err(err) => {
             tracing::error!(
@@ -124,18 +126,17 @@ async fn open_read_only_db(db_path: &Path) -> crate::Result<SqliteConnection> {
 }
 
 pub fn app_db_backup_dir() -> crate::Result<PathBuf> {
-    if let Some(path) = std::env::var_os("THESEUS_DB_BACKUP_DIR") {
+    let directories = super::DirectoryInfo::global_handle_if_ready().ok_or_else(|| {
+        crate::ErrorKind::FSError("Launcher directories are not ready".to_string())
+    })?;
+    backup_dir_for_settings(&directories.settings_dir)
+}
+
+fn backup_dir_for_settings(settings_dir: &Path) -> crate::Result<PathBuf> {
+    if let Some(path) = std::env::var_os("MONOCLE_DB_BACKUP_DIR") {
         return Ok(PathBuf::from(path));
     }
-
-    let base = dirs::data_local_dir().or_else(dirs::data_dir).ok_or(
-        crate::ErrorKind::FSError(
-            "Could not find valid data dir for app database backups"
-                .to_string(),
-        ),
-    )?;
-
-    Ok(base.join("Modrinth").join("Backups").join("app-db"))
+    Ok(settings_dir.join("Backups").join("app-db"))
 }
 
 async fn has_user_tables(conn: &mut SqliteConnection) -> crate::Result<bool> {

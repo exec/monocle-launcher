@@ -17,7 +17,7 @@ impl DiscordGuard {
     /// Initialize discord IPC client, and attempt to connect to it
     /// If it fails, it will still return a DiscordGuard, but the client will be unconnected
     pub fn init() -> crate::Result<DiscordGuard> {
-        let dipc = DiscordIpcClient::new("1123683254248148992");
+        let dipc = DiscordIpcClient::new("0");
 
         Ok(DiscordGuard {
             client: Arc::new(RwLock::new(dipc)),
@@ -29,6 +29,16 @@ impl DiscordGuard {
     /// This MUST be called first in any client method that requires a connection, because those can PANIC if the client is not connected
     /// (No connection is different than a failed connection, the latter will not panic and can be retried)
     pub async fn retry_if_not_ready(&self) -> bool {
+        let state = match State::get().await {
+            Ok(state) => state,
+            Err(_) => return false,
+        };
+        if !crate::state::Settings::get(&state.pool)
+            .await
+            .is_ok_and(|settings| settings.discord_rpc)
+        {
+            return false;
+        }
         let mut client = self.client.write().await;
         if !self.connected.load(std::sync::atomic::Ordering::Relaxed) {
             if client.connect().is_ok() {

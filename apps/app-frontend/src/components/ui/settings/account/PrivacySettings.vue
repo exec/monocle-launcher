@@ -5,7 +5,6 @@ import {
 	defineMessages,
 	injectNotificationManager,
 	injectPageContext,
-	Toggle,
 	useVIntl,
 } from '@modrinth/ui'
 import { ref, watch } from 'vue'
@@ -49,7 +48,7 @@ const messages = defineMessages({
 	discordRichPresenceDescription: {
 		id: 'app.settings.privacy.discord-rich-presence.description',
 		defaultMessage:
-			'Show Modrinth App as your current activity on Discord. This does not affect Rich Presence added to instances by mods. Requires an app restart.',
+			'Show Monocle Launcher as your current activity on Discord. This does not affect Rich Presence added to instances by mods. Requires an app restart.',
 	},
 })
 
@@ -97,7 +96,7 @@ watch(
 				{{ formatMessage(messages.telemetryDescription) }}
 			</p>
 		</div>
-		<Toggle id="opt-out-analytics" v-model="settings.telemetry" />
+		<span class="text-secondary">Disabled in Monocle</span>
 	</div>
 
 	<div class="mt-4 flex items-center justify-between gap-4">
@@ -109,6 +108,6 @@ watch(
 				{{ formatMessage(messages.discordRichPresenceDescription) }}
 			</p>
 		</div>
-		<Toggle id="disable-discord-rpc" v-model="settings.discord_rpc" />
+		<span class="text-secondary">Not configured for Monocle</span>
 	</div>
 </template>

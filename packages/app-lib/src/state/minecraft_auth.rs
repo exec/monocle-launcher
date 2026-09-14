@@ -265,6 +265,19 @@ impl OnlineProfileCacheIntent {
 }
 
 impl Credentials {
+	pub async fn get_for_launch(
+		user: Uuid,
+		exec: impl sqlx::Executor<'_, Database = sqlx::Sqlite> + Copy,
+	) -> crate::Result<Self> {
+		let mut credentials = Self::get_all(exec)
+			.await?
+			.remove(&user)
+			.map(|(_, credentials)| credentials)
+			.ok_or_else(|| crate::ErrorKind::NoCredentialsError.as_error())?;
+		credentials.refresh(exec).await?;
+		Ok(credentials)
+	}
+
     /// Refreshes the authentication tokens for this user if they are expired, or
     /// very close to expiration.
     async fn refresh(

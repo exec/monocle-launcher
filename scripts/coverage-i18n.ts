@@ -69,8 +69,8 @@ const PRODUCT_SCOPES: Record<
 		catalogScopes: ['apps/app-frontend', 'packages/ui'],
 	},
 	website: {
-		sourceDirectories: ['apps/frontend/src', 'packages/moderation/src', 'packages/ui/src'],
-		catalogScopes: ['packages/ui', 'packages/moderation', 'apps/frontend'],
+		sourceDirectories: ['packages/ui/src'],
+		catalogScopes: ['packages/ui'],
 	},
 }
 
@@ -763,10 +763,8 @@ function main() {
 
 	// Directories to scan for Vue files
 	const scanDirs = [
-		'apps/frontend/src',
 		'apps/app-frontend/src',
 		'packages/ui/src',
-		'packages/moderation/src',
 	]
 
 	if (!jsonOutput && !quiet) {

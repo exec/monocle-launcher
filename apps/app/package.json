@@ -1,6 +1,7 @@
 {
 	"name": "@modrinth/app",
 	"scripts": {
+		"monocle:check": "node monocle-check.mjs",
 		"tauri": "tauri",
 		"build": "tauri build",
 		"dev": "tauri dev --features export-app-events",

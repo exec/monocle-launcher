@@ -8,22 +8,22 @@
 
 import './omorphia.scss'
 
-import _FourOhFourNotFound from './branding/404.svg?component'
+import _FourOhFourNotFound from './MonocleIcon.vue'
 // Branding
-import _BrowserWindowSuccessIllustration from './branding/illustrations/browser-window-success.svg?component'
-import _InviteBackgroundIllustration from './branding/illustrations/invite-bg.webp?url'
-import _ModrinthIcon from './branding/logo.svg?component'
-import _ModrinthPlusIcon from './branding/modrinth-plus.svg?component'
-import _AngryRinthbot from './branding/rinthbot/angry.webp'
-import _AnnoyedRinthbot from './branding/rinthbot/annoyed.webp'
-import _ConfusedRinthbot from './branding/rinthbot/confused.webp'
-import _ExcitedRinthbot from './branding/rinthbot/excited.webp'
-import _LaughingRinthbot from './branding/rinthbot/laughing.webp'
-import _SadRinthbot from './branding/rinthbot/sad.webp'
-import _SleepingRinthbot from './branding/rinthbot/sleeping.webp'
-import _SobbingRinthbot from './branding/rinthbot/sobbing.webp'
-import _ThinkingRinthbot from './branding/rinthbot/thinking.webp'
-import _WavingRinthbot from './branding/rinthbot/waving.webp'
+import _BrowserWindowSuccessIllustration from './MonocleIcon.vue'
+import _InviteBackgroundIllustration from './monocle-icon.png'
+import _ModrinthIcon from './icons/package.svg?component'
+import _ModrinthPlusIcon from './icons/plus.svg?component'
+import _AngryRinthbot from './monocle-icon.png'
+import _AnnoyedRinthbot from './monocle-icon.png'
+import _ConfusedRinthbot from './monocle-icon.png'
+import _ExcitedRinthbot from './monocle-icon.png'
+import _LaughingRinthbot from './monocle-icon.png'
+import _SadRinthbot from './monocle-icon.png'
+import _SleepingRinthbot from './monocle-icon.png'
+import _SobbingRinthbot from './monocle-icon.png'
+import _ThinkingRinthbot from './monocle-icon.png'
+import _WavingRinthbot from './monocle-icon.png'
 // External Icons
 import _AppleIcon from './external/apple.svg?component'
 import _BlueskyIcon from './external/bluesky.svg?component'
@@ -228,3 +228,5 @@ export const SERVER_CATEGORY_ICON_MAP: Record<string, string> = {
 	whitelisted: 'badge-check',
 	'world-resets': 'refresh-ccw',
 }
+
+export { default as MonocleIcon } from "./MonocleIcon.vue"

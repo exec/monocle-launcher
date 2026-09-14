@@ -5,7 +5,6 @@ import {
 	HeartHandshakeIcon,
 	LanguagesIcon,
 	LightBulbIcon,
-	ModrinthIcon,
 	PaintbrushIcon,
 	RefreshCwIcon,
 	Settings2Icon,
@@ -29,6 +28,9 @@ import { getVersion } from '@tauri-apps/api/app'
 import { platform as getOsPlatform, version as getOsVersion } from '@tauri-apps/plugin-os'
 import { computed, provide, ref } from 'vue'
 
+import gplLicense from '../../../../../app/LICENSE?raw'
+
+import monocleIcon from '@/assets/monocle-icon.png'
 import PrivacySettings from '@/components/ui/settings/account/PrivacySettings.vue'
 import ProfileSettings from '@/components/ui/settings/account/ProfileSettings.vue'
 import SocialSettings from '@/components/ui/settings/account/SocialSettings.vue'
@@ -306,13 +308,25 @@ function devModeCount() {
 }
 
 const messages = defineMessages({
+	legalNotice: {
+		id: 'app.settings.monocle-legal-notice',
+		defaultMessage: 'Original code © Rinth, Inc. and contributors. GPL-3.0-only · No warranty.',
+	},
+	licenseLabel: {
+		id: 'app.settings.monocle-license',
+		defaultMessage: 'View license',
+	},
+	sourceLabel: {
+		id: 'app.settings.monocle-source',
+		defaultMessage: 'Monocle source & notices',
+	},
 	downloading: {
 		id: 'app.settings.downloading',
 		defaultMessage: 'Downloading v{version}',
 	},
 	appVersion: {
 		id: 'app.settings.app-version',
-		defaultMessage: 'Modrinth App {version}',
+		defaultMessage: 'Monocle Launcher {version}',
 	},
 	macos: {
 		id: 'app.settings.operating-system.macos',
@@ -373,12 +387,19 @@ const messages = defineMessages({
 						}"
 						@click="devModeCount"
 					>
-						<ModrinthIcon aria-hidden="true" class="w-6 h-6" />
+						<img :src="monocleIcon" alt="Monocle" class="w-6 h-6" />
 					</button>
 					<div v-if="appInfo" class="max-w-[200px]">
 						<p class="m-0">
 							{{ formatMessage(messages.appVersion, { version: appInfo.version }) }}
 						</p>
+						<p class="m-0 text-xs text-secondary">Forked from Modrinth App · GPL-3.0</p>
+						<p class="m-0 text-xs text-secondary">{{ formatMessage(messages.legalNotice) }}</p>
+						<a href="https://github.com/exec/monocle-launcher" target="_blank" rel="noopener noreferrer" class="text-xs">{{ formatMessage(messages.sourceLabel) }}</a>
+						<details class="text-xs">
+							<summary class="cursor-pointer">{{ formatMessage(messages.licenseLabel) }}</summary>
+							<pre class="max-h-48 overflow-auto whitespace-pre-wrap">{{ gplLicense }}</pre>
+						</details>
 						<p class="m-0">
 							<span v-if="appInfo.osPlatform === 'macos'">{{ formatMessage(messages.macos) }}</span>
 							<span v-else class="capitalize">{{ appInfo.osPlatform }}</span>

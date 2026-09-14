@@ -1,60 +1,29 @@
-name: 🎮 Bug with Modrinth App
-description: For issues with Modrinth App.
-labels: [app]
-type: 'bug'
+name: Launcher bug
+description: Report a Monocle Launcher or bot-control issue.
 body:
-  - type: checkboxes
-    attributes:
-      label: Please confirm the following.
-      options:
-        - label: I checked the [existing issues](https://github.com/modrinth/code/issues?q=is%3Aissue) for duplicate problems
-          required: true
-        - label: I have tried resolving the issue using the [support portal](https://support.modrinth.com)
-          required: true
-        - label: I have ensured my Modrinth App installation is up to date
-          required: true
   - type: input
     id: version
     attributes:
-      label: What version of the Modrinth App are you using?
-      description: Find this in ⚙️ Settings (bottom right) -> After Modrinth App (bottom left)
+      label: Launcher and client versions
     validations:
       required: true
-  - type: dropdown
-    id: oses
+  - type: input
+    id: platform
     attributes:
-      label: What operating systems are you seeing the problem on?
-      multiple: true
-      options:
-        - Windows
-        - MacOS
-        - Linux
+      label: Operating system and architecture
   - type: textarea
+    id: behavior
     attributes:
-      label: Describe the bug
-      description: A clear and concise description of what the bug is. Include screenshots if applicable.
+      label: What happened, and what did you expect?
     validations:
       required: true
   - type: textarea
+    id: steps
     attributes:
       label: Steps to reproduce
-      description: Steps to reproduce the behavior.
-      placeholder: |
-        1. Go to '...'
-        2. Click on '...'
-        3. Scroll down to '...'
-        4. See error
-    validations:
-      required: false
   - type: textarea
+    id: logs
     attributes:
-      label: Expected behavior
-      description: A clear and concise description of what you expected to happen.
-    validations:
-      required: false
-  - type: textarea
-    attributes:
-      label: Additional context
-      description: Add any other context about the problem here.
-    validations:
-      required: false
+      label: Relevant logs
+      description: Remove API tokens, crew keys, account credentials and other private information.
+      render: text

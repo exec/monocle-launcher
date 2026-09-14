@@ -54,7 +54,6 @@ import {
 	providePageContext,
 	providePopupNotificationManager,
 	TeleportOverflowMenu,
-	TextLogo,
 	useDebugLogger,
 	useFormatBytes,
 	useHostingIntercom,
@@ -76,6 +75,7 @@ import { RouterView, useRoute, useRouter } from 'vue-router'
 
 import AccountsCard from '@/components/ui/AccountsCard.vue'
 import AppActionBar from '@/components/ui/AppActionBar.vue'
+import monocleLogo from '@/assets/monocle-logo.png'
 import Breadcrumbs from '@/components/ui/Breadcrumbs.vue'
 import ErrorModal from '@/components/ui/ErrorModal.vue'
 import FriendsList from '@/components/ui/friends/FriendsList.vue'
@@ -97,7 +97,6 @@ import PromotionWrapper from '@/components/ui/PromotionWrapper.vue'
 import QuickInstanceSwitcher from '@/components/ui/QuickInstanceSwitcher.vue'
 import SharedInstanceInviteHandler from '@/components/ui/shared-instances/shared-instance-invite-handler/index.vue'
 import SplashScreen from '@/components/ui/SplashScreen.vue'
-import SurveyPopup from '@/components/ui/SurveyPopup.vue'
 import SyncInstancesUpdateModal from '@/components/ui/sync-instances-update-modal/index.vue'
 import {
 	markSyncInstancesUpdateNotificationShown,
@@ -268,7 +267,9 @@ const forceSidebar = computed(
 		route.path.startsWith('/project') ||
 		route.path.startsWith('/user'),
 )
-const sidebarVisible = computed(() => sidebarToggled.value || forceSidebar.value)
+const sidebarVisible = computed(
+	() => route.path !== '/bots' && (sidebarToggled.value || forceSidebar.value),
+)
 const hostingRouteActive = computed(() => route.path.startsWith('/hosting'))
 const hostingUpdateRequired = computed(
 	() =>
@@ -365,10 +366,8 @@ const hasPlus = computed(
 		(hasMidasBadge(credentials.value.user) ||
 			hasActivePride26Midas(authenticatedModrinthUser.value?.campaigns?.pride_26)),
 )
-const showAd = computed(
-	() => sidebarVisible.value && !hasPlus.value && credentials.value !== undefined,
-)
-const adConsentAvailable = computed(() => credentials.value !== undefined && !hasPlus.value)
+const showAd = computed(() => false)
+const adConsentAvailable = computed(() => false)
 providePageContext({
 	hierarchicalSidebarAvailable: ref(true),
 	showAds: showAd,
@@ -1815,16 +1814,16 @@ const updatePopupMessages = defineMessages({
 	},
 	meteredBody: {
 		id: 'app.update-popup.body.metered',
-		defaultMessage: `Modrinth App v{version} is available now! Since you're on a metered network, we didn't automatically download it.`,
+		defaultMessage: `Monocle Launcher v{version} is available now! Since you're on a metered network, we didn't automatically download it.`,
 	},
 	downloadedBody: {
 		id: 'app.update-popup.body.download-complete',
-		defaultMessage: `Modrinth App v{version} has finished downloading. Reload to update now, or automatically when you close Modrinth App.`,
+		defaultMessage: `Monocle Launcher v{version} has finished downloading. Reload to update now, or automatically when you close Monocle Launcher.`,
 	},
 	linuxBody: {
 		id: 'app.update-popup.body.linux',
 		defaultMessage:
-			'Modrinth App v{version} is available. Use your package manager to update for the latest features and fixes!',
+			'Monocle Launcher v{version} is available. Use your package manager to update for the latest features and fixes!',
 	},
 	reload: {
 		id: 'app.update-popup.reload',
@@ -2252,6 +2251,13 @@ provideAppUpdateDownloadProgress(appUpdateDownload)
 				<PlayIcon class="ml-0.5" />
 			</NavButton>
 			<NavButton
+				v-tooltip.right="'Bots · Control Room'"
+				to="/bots"
+				aria-label="Bots · Control Room"
+			>
+				<ServerStackIcon class="text-[#d8b76d]" />
+			</NavButton>
+			<NavButton
 				v-tooltip.right="formatMessage(commonMessages.discoverContentLabel)"
 				to="/browse/modpack"
 				:is-primary="() => route.path.startsWith('/browse') && !route.query.i && !route.query.sid"
@@ -2369,7 +2375,11 @@ provideAppUpdateDownloadProgress(appUpdateDownload)
 		</div>
 		<div data-tauri-drag-region class="app-grid-statusbar bg-bg-raised h-[--top-bar-height] flex">
 			<div data-tauri-drag-region class="flex min-w-0 flex-1 items-center overflow-hidden p-2">
-				<TextLogo class="h-7 w-auto shrink-0 text-contrast pointer-events-none" />
+				<img
+					:src="monocleLogo"
+					alt="Monocle Launcher"
+					class="h-9 w-auto max-w-[10rem] shrink-0 object-contain pointer-events-none"
+				/>
 				<div data-tauri-drag-region class="ml-2 flex shrink-0 items-center gap-2">
 					<IconButton
 						type="outlined"
@@ -2427,7 +2437,6 @@ provideAppUpdateDownloadProgress(appUpdateDownload)
 		}"
 	>
 		<div class="app-viewport flex-grow router-view">
-			<SurveyPopup />
 			<div
 				class="loading-indicator-container h-8 fixed z-50 pointer-events-none"
 				:style="{

@@ -11,6 +11,11 @@ export default new createRouter({
 			component: () => import('@/pages/Index.vue'),
 		},
 		{
+			path: '/bots',
+			name: 'Bots',
+			component: () => import('@/pages/Bots.vue'),
+		},
+		{
 			path: '/hosting/manage/',
 			name: 'Servers',
 			component: () => import('@/pages/Servers.vue'),

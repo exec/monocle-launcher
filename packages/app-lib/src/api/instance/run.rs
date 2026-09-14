@@ -24,7 +24,29 @@ pub async fn run(
     instance_id: &str,
     quick_play_type: QuickPlayType,
 ) -> crate::Result<ProcessMetadata> {
+	run_selected(instance_id, quick_play_type, None).await
+}
+
+pub async fn run_with_account(
+	instance_id: &str,
+	quick_play_type: QuickPlayType,
+	account: uuid::Uuid,
+) -> crate::Result<ProcessMetadata> {
+	run_selected(instance_id, quick_play_type, Some(account)).await
+}
+
+async fn run_selected(
+	instance_id: &str,
+	quick_play_type: QuickPlayType,
+	account: Option<uuid::Uuid>,
+) -> crate::Result<ProcessMetadata> {
+	// ponytail: serialize launches; per-instance locks if startup throughput matters.
+	static LAUNCH: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+	let _launch = LAUNCH.lock().await;
     let state = State::get().await?;
+	if state.process_manager.get_all().iter().any(|process| process.instance_id == instance_id) {
+		return Err(crate::ErrorKind::InputError("This instance is already running".into()).into());
+	}
     if crate::state::instances::adapters::sqlite::instance_rows::is_instance_quarantined(
         instance_id,
         &state.pool,
@@ -42,9 +64,12 @@ pub async fn run(
     )
     .await?;
 
-    let default_account = Credentials::get_default_credential(&state.pool)
-        .await?
-        .ok_or_else(|| crate::ErrorKind::NoCredentialsError.as_error())?;
+    let default_account = match account {
+		Some(user) => Credentials::get_for_launch(user, &state.pool).await?,
+		None => Credentials::get_default_credential(&state.pool)
+			.await?
+			.ok_or_else(|| crate::ErrorKind::NoCredentialsError.as_error())?,
+	};
 
     run_credentials(instance_id, &default_account, quick_play_type).await
 }

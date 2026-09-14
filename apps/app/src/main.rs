@@ -12,6 +12,7 @@ use tauri_plugin_fs::FsExt;
 use theseus::prelude::*;
 
 mod api;
+mod bots;
 
 #[cfg(target_os = "macos")]
 mod macos;
@@ -270,6 +271,7 @@ fn main() {
         .plugin(api::friends::init())
         .plugin(api::worlds::init())
         .manage(PendingUpdateData::default())
+        .manage(bots::HostProcess::default())
         .invoke_handler(tauri::generate_handler![
             initialize_state,
             is_dev,
@@ -281,6 +283,16 @@ fn main() {
             toggle_decorations,
             show_window,
             restart_app,
+            bots::bot_host_settings,
+            bots::bot_host_save,
+            bots::bot_host_initialize,
+            bots::bot_host_start,
+            bots::bot_host_snapshot,
+            bots::bot_host_control,
+            bots::bot_host_stop,
+            bots::bot_host_crew_keys,
+			bots::bot_worker_sessions,
+			bots::bot_worker_sessions_save,
         ]);
 
     tracing::info!("Initializing app...");

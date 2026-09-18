@@ -4,11 +4,15 @@ import { invoke } from '@tauri-apps/api/core'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 import { users } from '@/helpers/auth'
-import { canLaunchSession, launchSessions, sessionState } from '@/helpers/bot-sessions'
+import { canLaunchSession, launchSessions, sessionState, sessionRoster } from '@/helpers/bot-sessions'
 import { list, run } from '@/helpers/instance'
 import { get_all, kill } from '@/helpers/process'
 
-const props = defineProps({ workers: { type: Array, default: () => [] } })
+const props = defineProps({
+	workers: { type: Array, default: () => [] },
+	crews: { type: Array, default: () => [] },
+	crewLabels: { type: Object, default: () => ({}) },
+})
 const { formatMessage: t } = useVIntl()
 const messages = defineMessages({
 	title: { id: 'app.bots.sessions.title', defaultMessage: 'Local worker sessions' },
@@ -20,13 +24,25 @@ const messages = defineMessages({
 	setup: {
 		id: 'app.bots.sessions.setup',
 		defaultMessage:
-			'Install Monocle and configure Worker mode in each instance first. Binding a session does not change its in-game connection settings.',
+			'Choose an instance for each Minecraft account. Install Monocle in it, then select a crew to prepare Worker mode and its connection automatically before launch. No first connection is required.',
 	},
 	launchAll: { id: 'app.bots.sessions.launch-all', defaultMessage: 'Launch stopped sessions' },
 	refresh: { id: 'app.bots.sessions.refresh', defaultMessage: 'Refresh accounts & instances' },
 	empty: {
 		id: 'app.bots.sessions.empty',
-		defaultMessage: 'Connect a worker once to bind its account and local instance here.',
+		defaultMessage: 'Sign in to a Minecraft account in the launcher to set up your first local worker.',
+	},
+	crew: { id: 'app.bots.sessions.crew', defaultMessage: 'Initial crew / automatic connection' },
+	manual: { id: 'app.bots.sessions.manual', defaultMessage: 'Use the client’s connection settings' },
+	source: { id: 'app.bots.sessions.source', defaultMessage: 'Gameplay settings source' },
+	keepSettings: { id: 'app.bots.sessions.keep-settings', defaultMessage: 'Keep this worker’s settings' },
+	preparation: {
+		id: 'app.bots.sessions.preparation',
+		defaultMessage: 'Preparation runs before Minecraft starts. Source instances must be stopped. Only module settings are copied; enabled modules and keybinds stay with this worker. Originals are backed up under monocle-client/launcher-backups. Pending recovery keeps its existing configuration. Job profiles still come from the host for every worker.',
+	},
+	crewNote: {
+		id: 'app.bots.sessions.crew-note',
+		defaultMessage: 'The host’s recorded crew assignment takes precedence on later launches. Move an existing worker from Crews; the launcher does not undo host reassignments.',
 	},
 	account: { id: 'app.bots.sessions.account', defaultMessage: 'Minecraft account' },
 	instance: { id: 'app.bots.sessions.instance', defaultMessage: 'Local instance' },
@@ -79,19 +95,7 @@ const busy = ref(false)
 const notice = ref('')
 let timer
 let disposed = false
-const rows = computed(() => {
-	const workers = new Map(props.workers.map((worker) => [worker.id, worker]))
-	for (const binding of bindings.value) {
-		if (!workers.has(binding.worker))
-			workers.set(binding.worker, {
-				id: binding.worker,
-				name:
-					accounts.value.find((account) => account.id === binding.account)?.name || binding.worker,
-				connected: false,
-			})
-	}
-	return [...workers.values()]
-})
+const rows = computed(() => sessionRoster(props.workers, bindings.value, accounts.value))
 function binding(worker) {
 	return bindings.value.find((entry) => entry.worker === worker.id)
 }
@@ -99,9 +103,11 @@ function edit(worker) {
 	return (edits.value[worker.id] ||= {
 		...binding(worker),
 		worker: worker.id,
-		account: binding(worker)?.account || '',
+		account: binding(worker)?.account || accounts.value.find((account) => account.id === worker.id)?.id || '',
 		instance: binding(worker)?.instance || '',
 		server: binding(worker)?.server || '',
+		crew: binding(worker)?.crew || '',
+		template: binding(worker)?.template || '',
 	})
 }
 function running(worker) {
@@ -121,12 +127,16 @@ function ready(entry) {
 		draft &&
 		(draft.account !== entry.account ||
 			draft.instance !== entry.instance ||
-			draft.server !== entry.server)
+			draft.server !== entry.server ||
+			draft.crew !== (entry.crew || '') ||
+			draft.template !== (entry.template || ''))
 	)
 		return false
 	return (
 		accounts.value.some((account) => account.id === entry.account) &&
-		instances.value.some((instance) => instance.id === entry.instance)
+		instances.value.some((instance) => instance.id === entry.instance) &&
+		(!entry.template || instances.value.some((instance) => instance.id === entry.template) &&
+			!processes.value.some((process) => process.instance_id === entry.template))
 	)
 }
 async function refreshResources() {
@@ -281,6 +291,20 @@ onUnmounted(() => {
 				</div>
 			</div>
 			<div class="session-actions">
+				<label>{{ t(messages.crew) }}<select v-model="edit(worker).crew" :disabled="busy || running(worker).length">
+					<option value="">{{ t(messages.manual) }}</option>
+					<option v-if="edit(worker).crew && !crews.includes(edit(worker).crew)" :value="edit(worker).crew">{{ t(messages.missing) }}</option>
+					<option v-for="crew in crews" :key="crew" :value="crew">{{ crewLabels[crew] || crew }}</option>
+				</select></label>
+				<label>{{ t(messages.source) }}<select v-model="edit(worker).template" :disabled="busy || running(worker).length">
+					<option value="">{{ t(messages.keepSettings) }}</option>
+					<option v-if="edit(worker).template && !instances.some((i) => i.id === edit(worker).template)" :value="edit(worker).template">{{ t(messages.missing) }}</option>
+					<option v-for="instance in instances.filter((i) => i.id !== edit(worker).instance)" :key="instance.id" :value="instance.id">{{ instance.name }}</option>
+				</select></label>
+			</div>
+			<p v-if="edit(worker).crew" class="preparation-note">{{ t(messages.crewNote) }}</p>
+			<p v-if="edit(worker).crew || edit(worker).template" class="preparation-note">{{ t(messages.preparation) }}</p>
+			<div class="session-actions">
 				<button :disabled="busy || running(worker).length" @click="action(() => save(worker))">
 					{{ t(messages.save) }}
 				</button>
@@ -324,9 +348,9 @@ onUnmounted(() => {
 <style scoped>
 .sessions {
 	padding: 1.5rem;
-	border: 1px solid #b69a58;
+	border: 1px solid var(--surface-4);
 	border-radius: 1rem;
-	background: linear-gradient(125deg, #25232b, #17171f);
+	background: var(--surface-2);
 	color: #eeedf1;
 	margin-bottom: 1rem;
 }
@@ -353,11 +377,11 @@ p {
 	margin: 1rem 0;
 }
 .worker-session {
-	border: 1px solid #49424f;
+	border: 1px solid var(--surface-4);
 	border-radius: 0.75rem;
 	padding: 1rem;
 	margin: 0.75rem 0;
-	background: #ffffff04;
+	background: var(--surface-1);
 }
 .binding-fields {
 	display: grid;
@@ -374,19 +398,19 @@ select {
 	display: block;
 	width: 100%;
 	padding: 0.65rem;
-	background: #17171f;
+	background: var(--surface-3);
 	color: #eeedf1;
-	border: 1px solid #65566d;
+	border: 1px solid var(--surface-4);
 	border-radius: 0.5rem;
 	margin-top: 0.25rem;
 }
 button,
 a {
-	border: 1px solid #65566d;
+	border: 1px solid var(--surface-4);
 	border-radius: 0.5rem;
 	padding: 0.5rem 0.8rem;
 	color: #eeedf1;
-	background: #302a38;
+	background: var(--surface-3);
 	text-decoration: none;
 	font-size: 0.85rem;
 }
@@ -405,13 +429,14 @@ select:focus-visible {
 	outline-offset: 3px;
 }
 .launch-all {
-	color: #f4ddb0;
+	color: #19150b;
 	border-color: #b69a58;
-	background: linear-gradient(120deg, #5e4928, #352938);
+	background: linear-gradient(115deg, #ba9a5e, #ebd19a);
 }
 .session-actions {
 	justify-content: flex-start;
 }
+.preparation-note { font-size: .75rem; line-height: 1.6; margin: .75rem 0; }
 .session-state {
 	font-size: 0.8rem;
 	color: #bdb4cf;

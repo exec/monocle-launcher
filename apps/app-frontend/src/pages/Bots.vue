@@ -5,6 +5,9 @@ import { open } from '@tauri-apps/plugin-dialog'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
 import BotWorkerSessions from '@/components/bot-worker-sessions/index.vue'
+import BotDashboard from '@/components/bot-dashboard/index.vue'
+import BotLiveConfig from '@/components/bot-live-config/index.vue'
+import monocleIcon from '@/assets/monocle-icon.png'
 
 import { auto_install_java, find_filtered_jres } from '@/helpers/jre'
 import { useRootBreadcrumb } from '@/providers/breadcrumbs'
@@ -612,977 +615,1246 @@ onUnmounted(() => {
 
 <template>
 	<div class="control-room">
-		<header class="hero">
-			<div>
-				<p class="eyebrow">MONOCLE / OPERATIONS</p>
-				<h1>Keep the train moving.</h1>
-				<p>Crews are your people. Jobs are their work. Workflows are how it gets done.</p>
+		<aside class="command-rail" aria-label="Operations navigation">
+			<div class="rail-brand">
+				<img :src="monocleIcon" alt="" />
+				<div>MONOCLE<small>FLEET COMMAND</small></div>
 			</div>
+			<p class="rail-label">WORKSPACE</p>
 			<button
-				class="pill"
-				:class="{ healthy: connection.connected && saved }"
-				@click="tab = 'Settings'"
+				v-for="(description, name) in {
+					Overview: 'Your fleet at a glance',
+					Crews: 'Organize your people',
+					Jobs: 'Dispatch & track work',
+					Workflows: 'Build your playbook',
+					Workers: 'Sessions & telemetry',
+					Settings: 'Host & connections',
+				}"
+				:key="name"
+				:class="{ active: tab === name }"
+				:aria-label="name"
+				:title="name"
+				:aria-current="tab === name ? 'page' : undefined"
+				@click="tab = name"
 			>
-				{{
-					!saved
-						? 'Unsaved connection'
-						: connection.connected
-							? connection.managed
-								? 'Managed host · connected'
-								: 'External host · connected'
-							: 'Host disconnected'
-				}}
+				<span class="nav-mark" aria-hidden="true">{{
+					{ Overview: '◈', Crews: '⊞', Jobs: '▤', Workflows: '⑂', Workers: '▣', Settings: '⚙' }[
+						name
+					]
+				}}</span
+				><span
+					>{{ name }}<small>{{ description }}</small></span
+				>
 			</button>
-		</header>
-		<p v-if="notice" class="notice" role="status">{{ notice }}</p>
-		<p v-if="connection.error" class="notice" role="status">{{ connection.error }}</p>
-		<p v-if="host && !connection.connected" class="hint">
-			Showing the last snapshot, {{ ago(lastSnapshot) }}. Commands are disabled until the host
-			reconnects.
-		</p>
-		<div class="toolbar">
-			<nav aria-label="Operations sections">
-				<button
-					v-for="name in ['Overview', 'Crews', 'Jobs', 'Workflows', 'Workers', 'Settings']"
-					:key="name"
-					:class="{ active: tab === name }"
-					@click="tab = name"
-				>
-					{{ name }}
-				</button>
-			</nav>
-			<button
-				class="gold"
-				:disabled="!canControl || !host?.operationsVersion"
-				@click="action(() => prepareJob())"
-			>
-				+ New job
-			</button>
-		</div>
-		<BotWorkerSessions v-if="tab === 'Workers'" :workers="connection.connected && saved ? roster : roster.map((worker) => ({ ...worker, connected: false }))" />
-		<section v-if="tab === 'Settings' || (!host && tab !== 'Workers')" class="panel setup">
-			<h2>Host connection &amp; service</h2>
-			<div class="form-grid">
-				<label
-					>Host data directory<input
-						v-model="settings.dataDir"
-						:disabled="connection.managed"
-						@input="edited"
-					/><button :disabled="busy || connection.managed" @click="choose('dataDir')">
-						Choose directory
-					</button></label
-				>
-				<label
-					>Java 25 executable<input
-						v-model="settings.javaPath"
-						:disabled="connection.managed"
-						@input="edited"
-					/><span class="actions"
-						><button :disabled="busy || connection.managed" @click="choose('javaPath')">
-							Choose Java</button
-						><button :disabled="busy || connection.managed" @click="java(false)">
-							Find Java 25</button
-						><button :disabled="busy || connection.managed" @click="java(true)">
-							Install Java 25
-						</button></span
-					></label
-				>
+			<div class="rail-footer">
+				<span class="connection-dot" :class="{ online: connection.connected && saved }"></span
+				>{{ connection.connected && saved ? 'Host connected' : 'Host offline'
+				}}<small>One fleet. Every possibility.</small>
 			</div>
-			<div class="actions">
-				<button class="gold" :disabled="busy || connection.managed" @click="action(save)">
-					Save &amp; connect
-				</button>
+		</aside>
+		<main class="command-main">
+			<header class="hero">
+				<div>
+					<p class="eyebrow">CONTROL ROOM / {{ tab.toUpperCase() }}</p>
+					<h1>
+						{{
+							{
+								Overview: 'Your world, at work.',
+								Crews: 'Built to work together.',
+								Jobs: 'Give the fleet a direction.',
+								Workflows: 'From idea to automatic.',
+								Workers: 'Every account. In view.',
+								Settings: 'Make yourself at home.',
+							}[tab]
+						}}
+					</h1>
+					<p>
+						{{
+							{
+								Overview: 'Follow the work. Spot the hold-ups. Keep things moving.',
+								Crews: 'Organize workers, assign responsibility, and share the load.',
+								Jobs: 'Manage active work and prepare what comes next.',
+								Workflows: 'Reusable instructions for whatever you want to build next.',
+								Workers: 'Launch local sessions and inspect every connected worker.',
+								Settings: 'Connect your host and manage the fleet’s shared settings.',
+							}[tab]
+						}}
+					</p>
+				</div>
 				<button
-					:disabled="busy || !saved || connection.connected"
-					@click="action(() => invoke('bot_host_initialize'))"
+					class="pill"
+					:class="{ healthy: connection.connected && saved }"
+					@click="tab = 'Settings'"
 				>
-					Initialize new host
+					{{
+						!saved
+							? 'Unsaved connection'
+							: connection.connected
+								? connection.managed
+									? 'Managed host · connected'
+									: 'External host · connected'
+								: 'Host disconnected'
+					}}
 				</button>
+			</header>
+			<p v-if="notice" class="notice" role="status">{{ notice }}</p>
+			<p v-if="connection.error" class="notice" role="status">{{ connection.error }}</p>
+			<p v-if="host && !connection.connected" class="hint">
+				Showing the last snapshot, {{ ago(lastSnapshot) }}. Commands are disabled until the host
+				reconnects.
+			</p>
+			<div class="toolbar">
+				<nav class="mobile-sections" aria-label="Operations sections">
+					<button
+						v-for="name in ['Overview', 'Crews', 'Jobs', 'Workflows', 'Workers', 'Settings']"
+						:key="name"
+						:class="{ active: tab === name }"
+						@click="tab = name"
+					>
+						{{ name }}
+					</button>
+				</nav>
+				<span class="workspace-context">{{
+					host ? `${host.crews.length} crews in this workspace` : 'Connect a host to begin'
+				}}</span>
 				<button
-					:disabled="busy || !saved || connection.connected"
-					@click="action(() => invoke('bot_host_start'))"
+					class="gold"
+					:disabled="!canControl || !host?.operationsVersion"
+					@click="action(() => prepareJob())"
 				>
-					Start bundled host
+					+ New job
 				</button>
-				<button
-					:disabled="busy || !connection.managed"
-					@click="action(() => invoke('bot_host_stop'))"
-				>
-					Stop idle host
-				</button>
-				<button
-					:disabled="busy || !saved"
-					@click="
-						action(async () => {
-							crewKeys = await invoke('bot_host_crew_keys')
-						})
+			</div>
+			<BotWorkerSessions
+				v-if="tab === 'Workers'"
+				:crews="host?.crews || []"
+				:crew-labels="host?.crewLabels || {}"
+				:workers="
+					connection.connected && saved
+						? roster
+						: roster.map((worker) => ({ ...worker, connected: false }))
+				"
+			/>
+			<section v-if="tab === 'Settings' || (!host && tab !== 'Workers')" class="panel setup">
+				<h2>Host connection &amp; service</h2>
+				<div class="form-grid">
+					<label
+						>Host data directory<input
+							v-model="settings.dataDir"
+							:disabled="connection.managed"
+							@input="edited"
+						/><button :disabled="busy || connection.managed" @click="choose('dataDir')">
+							Choose directory
+						</button></label
+					>
+					<label
+						>Java 25 executable<input
+							v-model="settings.javaPath"
+							:disabled="connection.managed"
+							@input="edited"
+						/><span class="actions"
+							><button :disabled="busy || connection.managed" @click="choose('javaPath')">
+								Choose Java</button
+							><button :disabled="busy || connection.managed" @click="java(false)">
+								Find Java 25</button
+							><button :disabled="busy || connection.managed" @click="java(true)">
+								Install Java 25
+							</button></span
+						></label
+					>
+				</div>
+				<div class="actions">
+					<button class="gold" :disabled="busy || connection.managed" @click="action(save)">
+						Save &amp; connect
+					</button>
+					<button
+						:disabled="busy || !saved || connection.connected"
+						@click="action(() => invoke('bot_host_initialize'))"
+					>
+						Initialize new host
+					</button>
+					<button
+						:disabled="busy || !saved || connection.connected"
+						@click="action(() => invoke('bot_host_start'))"
+					>
+						Start bundled host
+					</button>
+					<button
+						:disabled="busy || !connection.managed"
+						@click="action(() => invoke('bot_host_stop'))"
+					>
+						Stop idle host
+					</button>
+					<button
+						:disabled="busy || !saved"
+						@click="
+							action(async () => {
+								crewKeys = await invoke('bot_host_crew_keys')
+							})
+						"
+					>
+						Reveal crew keys
+					</button>
+					<button v-if="crewKeys" @click="crewKeys = null">Hide keys</button>
+				</div>
+				<div v-if="crewKeys" class="key-list">
+					<label v-for="(key, crew) in crewKeys" :key="crew"
+						>{{ crewLabel(crew) }} worker key<input
+							:value="key"
+							readonly
+							autocomplete="off"
+							spellcheck="false"
+					/></label>
+				</div>
+				<p class="hint">
+					{{ connection.endpoint ? `Workers connect to ${connection.endpoint}. ` : '' }}The
+					controller attaches locally; configure the host's LAN bind/ports before starting.
+					Initialization never overwrites existing data.
+				</p>
+				<p class="hint">
+					Closing the launcher keeps the host and jobs running. Only a host started by this launcher
+					session can be stopped here, after jobs and recovery finish. Other hosts remain untouched.
+				</p>
+				<form
+					v-if="host?.operationsVersion"
+					@submit.prevent="
+						action(() => control({ op: 'host-settings', historyDays: Number(retention) }))
 					"
 				>
-					Reveal crew keys
-				</button>
-				<button v-if="crewKeys" @click="crewKeys = null">Hide keys</button>
-			</div>
-			<div v-if="crewKeys" class="key-list">
-				<label v-for="(key, crew) in crewKeys" :key="crew"
-					>{{ crewLabel(crew) }} worker key<input
-						:value="key"
-						readonly
-						autocomplete="off"
-						spellcheck="false"
-				/></label>
-			</div>
-			<p class="hint">
-				{{ connection.endpoint ? `Workers connect to ${connection.endpoint}. ` : '' }}The controller
-				attaches locally; configure the host's LAN bind/ports before starting. Initialization never
-				overwrites existing data.
-			</p>
-			<p class="hint">
-				Closing the launcher keeps the host and jobs running. Only a host started by this launcher
-				session can be stopped here, after jobs and recovery finish. Other hosts remain untouched.
-			</p>
-			<form
-				v-if="host?.operationsVersion"
-				@submit.prevent="
-					action(() => control({ op: 'host-settings', historyDays: Number(retention) }))
-				"
-			>
-				<label
-					>Job history retention (days; −1 keeps indefinitely, 0 removes finished history
-					immediately)<input
-						v-model="retention"
-						type="number"
-						min="-1"
-						max="3650"
-						required /></label
-				><button :disabled="!canControl">Save retention</button>
-			</form>
-		</section>
-		<template v-if="host && tab !== 'Settings'">
-			<p v-if="!host.operationsVersion" class="notice">
-				This host runs the earlier API. Monitoring and existing job controls work; start the new
-				bundled host when idle to enable crew management, saved workflows and unassigned jobs.
-			</p>
-			<div class="metrics">
-				<article>
-					<small>CONNECTED / KNOWN</small
-					><strong>{{ workers().length }} / {{ roster.length }}</strong>
-				</article>
-				<article>
-					<small>CREWS</small><strong>{{ host.crews.length }}</strong>
-				</article>
-				<article>
-					<small>ACTIVE JOBS</small><strong>{{ liveJobs.length }}</strong>
-				</article>
-				<article>
-					<small>NEEDS ATTENTION</small><strong>{{ issues.length }}</strong>
-				</article>
-			</div>
-			<section v-if="tab === 'Overview'" class="job-list">
-				<article class="panel">
-					<div class="task-title">
-						<h2>Operations now</h2>
-						<button @click="tab = 'Jobs'">Open jobs</button>
-					</div>
-					<p v-if="!liveJobs.length" class="hint">
-						No assigned work. Create a job, then assign a crew.
-					</p>
-					<div v-for="task in liveJobs" :key="task.id" class="operation-row">
-						<strong>{{ task.name }}</strong
-						><span class="pill">{{ task.status }}</span>
-						<p>
-							{{ crewLabel(task.crew) }} · {{ task.detail || 'Awaiting worker acknowledgment' }}
-						</p>
-						<progress
-							v-if="task.nativeDefinition"
-							:max="task.nativeDefinition.length"
-							:value="task.highwayProgress || 0"
-						></progress>
-						<p v-if="task.nativeDefinition">
-							{{ task.highwayProgress || 0 }} / {{ task.nativeDefinition.length }} road blocks
-						</p>
-					</div>
-				</article>
-				<article class="panel">
-					<h2>What is holding things up?</h2>
-					<p v-if="!issues.length" class="hint">No reported worker blockers in this snapshot.</p>
-					<div v-for="worker in issues" :key="worker.id" class="operation-row">
-						<strong>{{ worker.name }} · {{ crewLabel(worker.crew) }}</strong>
-						<p>{{ state(worker).detail }}</p>
-						<small
-							>{{ state(worker).phase }} · observation {{ worker.observationAgeMs }} ms old</small
-						>
-					</div>
-				</article>
-				<article class="panel">
-					<h2>Host activity</h2>
-					<p v-if="!host.activity?.length" class="hint">No recent events reported by this host.</p>
-					<div
-						v-for="(event, i) in [...(host.activity || [])].reverse().slice(0, 30)"
-						:key="i"
-						class="activity-row"
-					>
-						<small>{{ ago(event.at) }}</small
-						><strong>{{ event.event }}</strong
-						><span>{{ event.worker ? workerName(event.worker) : '' }} {{ event.detail }}</span>
-					</div>
-					<p v-if="host.lastConnectionError" class="notice">{{ host.lastConnectionError }}</p>
-				</article>
-			</section>
-			<section v-else-if="tab === 'Crews'" class="job-list">
-				<form
-					v-if="host.operationsVersion"
-					class="panel actions"
-					@submit.prevent="action(createCrew)"
-				>
 					<label
-						>New crew name<input
-							v-model="crewName"
-							maxlength="48"
-							placeholder="Westbound crew"
+						>Job history retention (days; −1 keeps indefinitely, 0 removes finished history
+						immediately)<input
+							v-model="retention"
+							type="number"
+							min="-1"
+							max="3650"
 							required /></label
-					><button class="gold" :disabled="!canControl">Create crew</button>
+					><button :disabled="!canControl">Save retention</button>
 				</form>
-				<div class="crew-grid">
-					<article v-for="crew in host.crews" :key="crew" class="panel">
-						<p class="eyebrow">CREW</p>
-						<div class="task-title">
-							<h2>{{ crewLabel(crew) }}</h2>
-							<span class="pill">{{ host.highways[crew]?.phase || 'Idle' }}</span>
-						</div>
-						<p>
-							{{ workers().filter((w) => w.crew === crew).length }} connected workers ·
-							{{ roster.filter((w) => w.crew === crew).length }} known
-						</p>
-						<p>
-							{{
-								roster
-									.filter((w) => w.crew === crew)
-									.map((w) => w.name + (w.connected ? '' : ' (offline)'))
-									.join(' · ') || 'No workers assigned'
-							}}
-						</p>
-						<template v-if="host.highways[crew]?.length"
-							><progress
-								:max="host.highways[crew].length"
-								:value="host.highways[crew].progress"
-							></progress>
+			</section>
+			<template v-if="host && tab !== 'Settings'">
+				<p v-if="!host.operationsVersion" class="notice">
+					This host runs the earlier API. Monitoring and existing job controls work; start the new
+					bundled host when idle to enable crew management, saved workflows and unassigned jobs.
+				</p>
+				<div v-if="tab !== 'Overview'" class="metrics">
+					<article>
+						<small>CONNECTED / KNOWN</small
+						><strong>{{ workers().length }} / {{ roster.length }}</strong>
+					</article>
+					<article>
+						<small>CREWS</small><strong>{{ host.crews.length }}</strong>
+					</article>
+					<article>
+						<small>ACTIVE JOBS</small><strong>{{ liveJobs.length }}</strong>
+					</article>
+					<article>
+						<small>NEEDS ATTENTION</small><strong>{{ issues.length }}</strong>
+					</article>
+				</div>
+				<BotDashboard
+					v-if="tab === 'Overview'"
+					:host="host"
+					:workers="roster"
+					:jobs="liveJobs"
+					:issues="issues"
+					:connected="connection.connected && saved"
+					:can-control="canControl"
+					:snapshot-at="lastSnapshot"
+					@navigate="tab = $event"
+					@task-action="taskAction"
+				/>
+				<section v-if="tab === 'Crews'" class="job-list">
+					<form
+						v-if="host.operationsVersion"
+						class="panel actions"
+						@submit.prevent="action(createCrew)"
+					>
+						<label
+							>New crew name<input
+								v-model="crewName"
+								maxlength="48"
+								placeholder="Westbound crew"
+								required /></label
+						><button class="gold" :disabled="!canControl">Create crew</button>
+					</form>
+					<div class="crew-grid">
+						<article v-for="crew in host.crews" :key="crew" class="panel">
+							<p class="eyebrow">CREW</p>
+							<div class="task-title">
+								<h2>{{ crewLabel(crew) }}</h2>
+								<span class="pill">{{ host.highways[crew]?.phase || 'Idle' }}</span>
+							</div>
 							<p>
-								{{ host.highways[crew].progress }} / {{ host.highways[crew].length }} road blocks
-							</p></template
+								{{ workers().filter((w) => w.crew === crew).length }} connected workers ·
+								{{ roster.filter((w) => w.crew === crew).length }} known
+							</p>
+							<p>
+								{{
+									roster
+										.filter((w) => w.crew === crew)
+										.map((w) => w.name + (w.connected ? '' : ' (offline)'))
+										.join(' · ') || 'No workers assigned'
+								}}
+							</p>
+							<template v-if="host.highways[crew]?.length"
+								><progress
+									:max="host.highways[crew].length"
+									:value="host.highways[crew].progress"
+								></progress>
+								<p>
+									{{ host.highways[crew].progress }} / {{ host.highways[crew].length }} road blocks
+								</p></template
+							>
+							<div class="actions">
+								<button
+									class="gold"
+									:disabled="!canControl || !host.operationsVersion"
+									@click="action(() => assignCrew(crew))"
+								>
+									Assign crew</button
+								><button
+									:disabled="!canControl || !host.operationsVersion"
+									@click="action(() => prepareJob(crew))"
+								>
+									New job for crew</button
+								><button
+									:disabled="!canControl || !host.operationsVersion"
+									@click="action(() => renameCrew(crew))"
+								>
+									Rename</button
+								><button
+									:disabled="!canControl || !host.operationsVersion"
+									@click="action(() => deleteCrew(crew))"
+								>
+									Delete
+								</button>
+							</div>
+							<details>
+								<summary>Recovery &amp; coordinator</summary>
+								<p>
+									Supply owner:
+									{{
+										host.highways[crew]?.supplyOwner
+											? workerName(host.highways[crew].supplyOwner)
+											: 'None'
+									}}
+									· pending cleanup: {{ host.highways[crew]?.pendingEnds || 0 }}
+								</p>
+								<p class="hint">
+									Only clear an item transfer after inspecting the participants and dropped items.
+									Ending execution preserves recovery receipts.
+								</p>
+								<div class="actions">
+									<button
+										:disabled="!canControl || !host.highways[crew]?.execution"
+										@click="action(() => resolveTransfer(crew))"
+									>
+										Resolve inspected transfer</button
+									><button
+										:disabled="!canControl || !host.highways[crew]?.execution"
+										@click="action(() => endHighway(crew))"
+									>
+										Cancel crew execution
+									</button>
+								</div>
+								<pre>{{ JSON.stringify(host.highways[crew], null, 2) }}</pre>
+							</details>
+						</article>
+					</div>
+				</section>
+				<section v-else-if="tab === 'Workers'" class="panel">
+					<div class="task-title">
+						<h2>Workers</h2>
+						<label
+							>Show<select v-model="workerFilter">
+								<option>All</option>
+								<option>Connected</option>
+								<option>Offline</option>
+								<option v-for="crew in host.crews" :key="crew" :value="crew">
+									{{ crewLabel(crew) }}
+								</option>
+							</select></label
 						>
-						<div class="actions">
+					</div>
+					<p class="hint">
+						Offline workers retain their last observation; it is never treated as live verification.
+					</p>
+					<div class="table-wrap">
+						<table>
+							<thead>
+								<tr>
+									<th>Worker</th>
+									<th>Crew</th>
+									<th>Position</th>
+									<th>State &amp; decisions</th>
+								</tr>
+							</thead>
+							<tbody>
+								<tr
+									v-for="worker in roster.filter(
+										(w) =>
+											workerFilter === 'All' ||
+											(workerFilter === 'Connected' && w.connected) ||
+											(workerFilter === 'Offline' && !w.connected) ||
+											w.crew === workerFilter,
+									)"
+									:key="worker.id"
+								>
+									<td>
+										<strong>{{ worker.name }}</strong
+										><small>{{ worker.scope?.split('\n')[1] || 'World unknown' }}</small
+										><small>{{
+											worker.connected ? 'Connected' : 'Offline · ' + ago(worker.lastSeen)
+										}}</small>
+									</td>
+									<td>
+										<select
+											:value="worker.crew"
+											:disabled="!canControl || !worker.connected || !host.operationsVersion"
+											:aria-label="'Crew for ' + worker.name"
+											@change="action(() => moveWorker(worker, $event))"
+										>
+											<option v-for="crew in host.crews" :key="crew" :value="crew">
+												{{ crewLabel(crew) }}
+											</option>
+										</select>
+									</td>
+									<td class="coords">
+										{{ worker.x ?? '—' }}, {{ worker.y ?? '—' }}, {{ worker.z ?? '—'
+										}}<small>{{
+											worker.positionFresh ? 'Live position' : 'Last-known / unavailable'
+										}}</small>
+									</td>
+									<td>
+										<span
+											class="pill"
+											:class="{ healthy: worker.connected && state(worker).phase === 'Ready' }"
+											>{{ state(worker).phase }}</span
+										>
+										<p>{{ state(worker).detail }}</p>
+										<details>
+											<summary>Inventory, execution &amp; checkpoints</summary>
+											<p>
+												Current run: {{ worker.current || 'None' }} ·
+												{{
+													worker.reconciled ? 'Host state reconciled' : 'Awaiting reconciliation'
+												}}
+											</p>
+											<pre v-if="nativeWorker(worker)?.inventory">{{
+												JSON.stringify(nativeWorker(worker).inventory, null, 2)
+											}}</pre>
+											<div v-for="item in workerRuns(worker)" :key="item.task.id">
+												<strong>{{ item.task.name }} · {{ item.run.status }}</strong>
+												<p>{{ item.run.detail || 'No blocker reported' }}</p>
+												<small
+													>Priority {{ item.task.overrides?.[worker.id] ?? item.task.priority }} ·
+													action {{ item.run.action?.type || 'Between workflow steps' }} · command
+													token {{ item.run.token || 'None' }}</small
+												><button :disabled="!canControl" @click="priority(item.task, worker.id)">
+													Change priority
+												</button>
+												<BotLiveConfig :task="item.task" :run="item.run" :worker="worker.id" :can-control="canControl && !busy" @configure="(body) => action(() => control(body))" />
+												<pre>{{ JSON.stringify(item.run, null, 2) }}</pre>
+											</div>
+											<pre>{{ JSON.stringify(worker.diagnostics, null, 2) }}</pre>
+										</details>
+									</td>
+								</tr>
+							</tbody>
+						</table>
+					</div>
+				</section>
+				<section v-else-if="tab === 'Workflows'" class="job-list">
+					<div class="panel">
+						<div class="task-title">
+							<h2>Workflow library</h2>
 							<button
 								class="gold"
 								:disabled="!canControl || !host.operationsVersion"
-								@click="action(() => assignCrew(crew))"
+								@click="newWorkflow"
 							>
-								Assign crew</button
-							><button
-								:disabled="!canControl || !host.operationsVersion"
-								@click="action(() => prepareJob(crew))"
-							>
-								New job for crew</button
-							><button
-								:disabled="!canControl || !host.operationsVersion"
-								@click="action(() => renameCrew(crew))"
-							>
-								Rename</button
-							><button
-								:disabled="!canControl || !host.operationsVersion"
-								@click="action(() => deleteCrew(crew))"
-							>
-								Delete
+								+ Lua workflow
 							</button>
 						</div>
-						<details>
-							<summary>Recovery &amp; coordinator</summary>
+						<label
+							>Find workflow<input v-model="librarySearch" placeholder="Folder or name" /></label
+						><label
+							>Import captured package<input
+								type="file"
+								accept=".json,application/json"
+								:disabled="!canControl || !host.operationsVersion"
+								@change="action(() => importWorkflow($event))"
+						/></label>
+						<p class="hint">
+							Export captures from a client with <code>.bot export-workflow &lt;id&gt;</code>.
+							Built-ins are read-only. Duplicates and edits never alter jobs already queued.
+							Built-in templates inherit worker settings except explicit job-form overrides;
+							imported profiles synchronize the captured configuration.
+						</p>
+					</div>
+					<article v-for="folder in workflowFolders" :key="folder" class="panel">
+						<p class="eyebrow">{{ folder }}</p>
+						<div
+							v-for="record in visibleWorkflows.filter((w) => w.folder === folder)"
+							:key="record.id"
+							class="operation-row"
+						>
+							<div class="task-title">
+								<h3>{{ record.name }}</h3>
+								<span class="pill">{{
+									record.builtin ? 'Built-in · read-only' : 'Custom snapshot'
+								}}</span>
+							</div>
 							<p>
-								Supply owner:
+								{{ record.highway ? 'Native highway' : 'Lua workflow' }} ·
 								{{
-									host.highways[crew]?.supplyOwner
-										? workerName(host.highways[crew].supplyOwner)
-										: 'None'
+									record.configured
+										? 'Captured module profiles'
+										: 'Worker settings + explicit overrides'
 								}}
-								· pending cleanup: {{ host.highways[crew]?.pendingEnds || 0 }}
-							</p>
-							<p class="hint">
-								Only clear an item transfer after inspecting the participants and dropped items.
-								Ending execution preserves recovery receipts.
+								· {{ record.profiles.join(' · ') }}
 							</p>
 							<div class="actions">
-								<button
-									:disabled="!canControl || !host.highways[crew]?.execution"
-									@click="action(() => resolveTransfer(crew))"
-								>
-									Resolve inspected transfer</button
+								<button :disabled="!canControl" @click="action(() => useWorkflow(record.id))">
+									Create job</button
+								><button :disabled="!canControl" @click="action(() => openEditor(record.id))">
+									{{ record.builtin ? 'Inspect / customize copy' : 'Edit' }}</button
 								><button
-									:disabled="!canControl || !host.highways[crew]?.execution"
-									@click="action(() => endHighway(crew))"
+									:disabled="!canControl"
+									@click="action(() => duplicateWorkflow(record.id))"
 								>
-									Cancel crew execution
+									Duplicate</button
+								><button
+									v-if="!record.builtin"
+									:disabled="!canControl"
+									@click="
+										confirmed('Delete this workflow? Existing jobs keep their snapshot.', () =>
+											control({ op: 'workflow-delete', id: record.id }),
+										)
+									"
+								>
+									Delete
 								</button>
 							</div>
-							<pre>{{ JSON.stringify(host.highways[crew], null, 2) }}</pre>
-						</details>
-					</article>
-				</div>
-			</section>
-			<section v-else-if="tab === 'Workers'" class="panel">
-				<div class="task-title">
-					<h2>Workers</h2>
-					<label
-						>Show<select v-model="workerFilter">
-							<option>All</option>
-							<option>Connected</option>
-							<option>Offline</option>
-							<option v-for="crew in host.crews" :key="crew" :value="crew">
-								{{ crewLabel(crew) }}
-							</option>
-						</select></label
-					>
-				</div>
-				<p class="hint">
-					Offline workers retain their last observation; it is never treated as live verification.
-				</p>
-				<div class="table-wrap">
-					<table>
-						<thead>
-							<tr>
-								<th>Worker</th>
-								<th>Crew</th>
-								<th>Position</th>
-								<th>State &amp; decisions</th>
-							</tr>
-						</thead>
-						<tbody>
-							<tr
-								v-for="worker in roster.filter(
-									(w) =>
-										workerFilter === 'All' ||
-										(workerFilter === 'Connected' && w.connected) ||
-										(workerFilter === 'Offline' && !w.connected) ||
-										w.crew === workerFilter,
-								)"
-								:key="worker.id"
-							>
-								<td>
-									<strong>{{ worker.name }}</strong
-									><small>{{ worker.scope?.split('\n')[1] || 'World unknown' }}</small
-									><small>{{
-										worker.connected ? 'Connected' : 'Offline · ' + ago(worker.lastSeen)
-									}}</small>
-								</td>
-								<td>
-									<select
-										:value="worker.crew"
-										:disabled="!canControl || !worker.connected || !host.operationsVersion"
-										:aria-label="'Crew for ' + worker.name"
-										@change="action(() => moveWorker(worker, $event))"
-									>
-										<option v-for="crew in host.crews" :key="crew" :value="crew">
-											{{ crewLabel(crew) }}
-										</option>
-									</select>
-								</td>
-								<td class="coords">
-									{{ worker.x ?? '—' }}, {{ worker.y ?? '—' }}, {{ worker.z ?? '—'
-									}}<small>{{
-										worker.positionFresh ? 'Live position' : 'Last-known / unavailable'
-									}}</small>
-								</td>
-								<td>
-									<span
-										class="pill"
-										:class="{ healthy: worker.connected && state(worker).phase === 'Ready' }"
-										>{{ state(worker).phase }}</span
-									>
-									<p>{{ state(worker).detail }}</p>
-									<details>
-										<summary>Inventory, execution &amp; checkpoints</summary>
-										<p>
-											Current run: {{ worker.current || 'None' }} ·
-											{{ worker.reconciled ? 'Host state reconciled' : 'Awaiting reconciliation' }}
-										</p>
-										<pre v-if="nativeWorker(worker)?.inventory">{{
-											JSON.stringify(nativeWorker(worker).inventory, null, 2)
-										}}</pre>
-										<div v-for="item in workerRuns(worker)" :key="item.task.id">
-											<strong>{{ item.task.name }} · {{ item.run.status }}</strong>
-											<p>{{ item.run.detail || 'No blocker reported' }}</p>
-											<small
-												>Priority {{ item.task.overrides?.[worker.id] ?? item.task.priority }} ·
-												action {{ item.run.action?.type || 'Between workflow steps' }} · command
-												token {{ item.run.token || 'None' }}</small
-											><button :disabled="!canControl" @click="priority(item.task, worker.id)">
-												Change priority
-											</button>
-											<pre>{{ JSON.stringify(item.run, null, 2) }}</pre>
-										</div>
-										<pre>{{ JSON.stringify(worker.diagnostics, null, 2) }}</pre>
-									</details>
-								</td>
-							</tr>
-						</tbody>
-					</table>
-				</div>
-			</section>
-			<section v-else-if="tab === 'Workflows'" class="job-list">
-				<div class="panel">
-					<div class="task-title">
-						<h2>Workflow library</h2>
-						<button
-							class="gold"
-							:disabled="!canControl || !host.operationsVersion"
-							@click="newWorkflow"
-						>
-							+ Lua workflow
-						</button>
-					</div>
-					<label>Find workflow<input v-model="librarySearch" placeholder="Folder or name" /></label
-					><label
-						>Import captured package<input
-							type="file"
-							accept=".json,application/json"
-							:disabled="!canControl || !host.operationsVersion"
-							@change="action(() => importWorkflow($event))"
-					/></label>
-					<p class="hint">
-						Export captures from a client with <code>.bot export-workflow &lt;id&gt;</code>.
-						Built-ins are read-only. Duplicates and edits never alter jobs already queued. Built-in
-						templates inherit worker settings except explicit job-form overrides; imported profiles
-						synchronize the captured configuration.
-					</p>
-				</div>
-				<article v-for="folder in workflowFolders" :key="folder" class="panel">
-					<p class="eyebrow">{{ folder }}</p>
-					<div
-						v-for="record in visibleWorkflows.filter((w) => w.folder === folder)"
-						:key="record.id"
-						class="operation-row"
-					>
-						<div class="task-title">
-							<h3>{{ record.name }}</h3>
-							<span class="pill">{{
-								record.builtin ? 'Built-in · read-only' : 'Custom snapshot'
-							}}</span>
 						</div>
-						<p>
-							{{ record.highway ? 'Native highway' : 'Lua workflow' }} ·
-							{{
-								record.configured
-									? 'Captured module profiles'
-									: 'Worker settings + explicit overrides'
-							}}
-							· {{ record.profiles.join(' · ') }}
-						</p>
+					</article>
+				</section>
+				<section v-else-if="tab === 'Jobs'" class="job-list">
+					<div class="actions">
+						<button :class="{ active: !jobHistory }" @click="jobHistory = false">
+							Active &amp; unassigned</button
+						><button :class="{ active: jobHistory }" @click="jobHistory = true">Job history</button>
+					</div>
+					<article v-for="draft in jobHistory ? [] : draftJobs" :key="draft.id" class="panel">
+						<div class="task-title">
+							<h2>{{ draft.name }}</h2>
+							<span class="pill">Unassigned</span>
+						</div>
+						<p>{{ draft.server }} · {{ draft.dimension }} · Priority {{ draft.priority }}</p>
+						<p v-if="draft.args?.length">{{ draft.args.length }} road blocks</p>
 						<div class="actions">
-							<button :disabled="!canControl" @click="action(() => useWorkflow(record.id))">
-								Create job</button
-							><button :disabled="!canControl" @click="action(() => openEditor(record.id))">
-								{{ record.builtin ? 'Inspect / customize copy' : 'Edit' }}</button
-							><button :disabled="!canControl" @click="action(() => duplicateWorkflow(record.id))">
-								Duplicate</button
-							><button
-								v-if="!record.builtin"
+							<button
+								class="gold"
 								:disabled="!canControl"
 								@click="
-									confirmed('Delete this workflow? Existing jobs keep their snapshot.', () =>
-										control({ op: 'workflow-delete', id: record.id }),
+									action(async () => {
+										await assignCrew(currentCrew)
+										assignmentId = draft.id
+									})
+								"
+							>
+								Assign crew</button
+							><button :disabled="!canControl" @click="action(() => editDraft(draft.id))">
+								Edit</button
+							><button
+								:disabled="!canControl"
+								@click="
+									confirmed('Delete this unassigned job?', () =>
+										control({ op: 'draft-delete', id: draft.id }),
 									)
 								"
 							>
 								Delete
 							</button>
 						</div>
-					</div>
-				</article>
-			</section>
-			<section v-else-if="tab === 'Jobs'" class="job-list">
-				<div class="actions">
-					<button :class="{ active: !jobHistory }" @click="jobHistory = false">
-						Active &amp; unassigned</button
-					><button :class="{ active: jobHistory }" @click="jobHistory = true">Job history</button>
-				</div>
-				<article v-for="draft in jobHistory ? [] : draftJobs" :key="draft.id" class="panel">
-					<div class="task-title">
-						<h2>{{ draft.name }}</h2>
-						<span class="pill">Unassigned</span>
-					</div>
-					<p>{{ draft.server }} · {{ draft.dimension }} · Priority {{ draft.priority }}</p>
-					<p v-if="draft.args?.length">{{ draft.args.length }} road blocks</p>
-					<div class="actions">
-						<button
-							class="gold"
-							:disabled="!canControl"
-							@click="
-								action(async () => {
-									await assignCrew(currentCrew)
-									assignmentId = draft.id
-								})
-							"
-						>
-							Assign crew</button
-						><button :disabled="!canControl" @click="action(() => editDraft(draft.id))">Edit</button
-						><button
-							:disabled="!canControl"
-							@click="
-								confirmed('Delete this unassigned job?', () =>
-									control({ op: 'draft-delete', id: draft.id }),
-								)
-							"
-						>
-							Delete
-						</button>
-					</div>
-				</article>
-				<p
-					v-if="
-						!(jobHistory ? finishedHistory : liveJobs).length && (jobHistory || !draftJobs.length)
-					"
-					class="panel hint"
-				>
-					{{
-						jobHistory
-							? 'No finished job history.'
-							: 'No jobs. Create work first, then assign your crew.'
-					}}
-				</p>
-				<article
-					v-for="task in jobHistory ? finishedHistory : liveJobs"
-					:key="task.id"
-					class="panel"
-				>
-					<div class="task-title">
-						<h2>{{ task.name }}</h2>
-						<span class="pill">{{ task.status }}</span>
-					</div>
-					<p>{{ crewLabel(task.crew) }} · {{ task.server }} · Priority {{ task.priority }}</p>
-					<p>{{ task.detail || 'Awaiting workflow state' }}</p>
-					<template v-if="task.nativeDefinition"
-						><progress
-							:max="task.nativeDefinition.length"
-							:value="task.highwayProgress || 0"
-						></progress>
-						<p>
-							{{ task.highwayProgress || 0 }} / {{ task.nativeDefinition.length }} road blocks
-						</p></template
+					</article>
+					<p
+						v-if="
+							!(jobHistory ? finishedHistory : liveJobs).length && (jobHistory || !draftJobs.length)
+						"
+						class="panel hint"
 					>
-					<p v-if="task.cleanupPending" class="notice">
-						Cancellation is already final. Waiting for worker cleanup/recovery acknowledgments;
-						offline workers receive cancellation when they reconnect.
+						{{
+							jobHistory
+								? 'No finished job history.'
+								: 'No jobs. Create work first, then assign your crew.'
+						}}
 					</p>
-					<div class="actions">
-						<template v-if="!jobHistory"
-							><button
-								:disabled="!canControl || ['Complete', 'Cancelled', 'Failed'].includes(task.status)"
-								@click="taskAction(task, 'pause')"
-							>
-								Pause</button
-							><button
-								:disabled="!canControl || ['Complete', 'Cancelled', 'Failed'].includes(task.status)"
-								@click="taskAction(task, 'resume')"
-							>
-								Resume / retry</button
-							><button
-								:disabled="!canControl || ['Complete', 'Cancelled', 'Failed'].includes(task.status)"
-								@click="taskAction(task, 'cancel')"
-							>
-								Cancel</button
-							><button
-								v-if="
-									task.nativeDefinition &&
-									!task.cleanupPending &&
-									!task.cancelled &&
-									host.operationsVersion
-								"
-								:disabled="!canControl"
-								@click="action(() => releaseJob(task))"
-							>
-								Release crew · keep job</button
-							><button :disabled="!canControl" @click="priority(task)">Priority</button></template
-						><template v-else
-							><button
-								v-if="
-									task.nativeDefinition &&
-									(task.highwayProgress || 0) < task.nativeDefinition.length
-								"
-								:disabled="!canControl || task.cleanupPending || !host.operationsVersion"
-								@click="action(() => continueHighway(task))"
-							>
-								Continue from verified checkpoint</button
-							><button
-								:disabled="!canControl || task.cleanupPending"
-								@click="taskAction(task, 'delete')"
-							>
-								Delete history
-							</button></template
-						>
-					</div>
-					<details>
-						<summary>Worker acknowledgments &amp; checkpoints</summary>
-						<div v-for="(run, id) in task.runs" :key="id" class="operation-row">
-							<strong>{{ workerName(id) }} · {{ run.status }}</strong>
-							<p>{{ run.detail || 'No blocker reported' }}</p>
-							<small
-								>Action {{ run.action?.type || 'Between steps / queued' }} · effective priority
-								{{ task.overrides?.[id] ?? task.priority }}</small
-							><button v-if="!jobHistory" :disabled="!canControl" @click="priority(task, id)">
-								Worker priority
-							</button>
-							<pre>{{ JSON.stringify(run, null, 2) }}</pre>
-						</div>
-						<pre>{{ JSON.stringify(task, null, 2) }}</pre>
-					</details>
-				</article>
-			</section>
-		</template>
-		<dialog ref="dialog" class="dispatch-dialog">
-			<form @submit.prevent="dispatch">
-				<div class="task-title">
-					<h2>{{ draftId ? 'Edit unassigned job' : 'Create job' }}</h2>
-					<button type="button" @click="dialog.close()">Close</button>
-				</div>
-				<fieldset :disabled="busy || !!pending">
-					<label>Job name<input v-model="job.name" maxlength="48" required /></label>
-					<label v-if="!draftId"
-						>Workflow<select v-model="workflowId" @change="action(() => loadWorkflow(workflowId))">
-							<option v-for="w in host?.workflows" :key="w.id" :value="w.id">
-								{{ w.folder }} / {{ w.name }}
-							</option>
-						</select></label
+					<article
+						v-for="task in jobHistory ? finishedHistory : liveJobs"
+						:key="task.id"
+						class="panel"
 					>
-					<template v-if="jobType === 'Highway'">
-						<div class="form-grid">
-							<label v-for="axis in ['x', 'y', 'z']" :key="axis"
-								>Origin {{ axis.toUpperCase()
-								}}<input v-model="highway[axis]" type="number" step="1" required /></label
-							><label
-								>Direction<select v-model="highway.direction">
-									<option v-for="(_, direction) in directions" :key="direction">
-										{{ direction }}
-									</option>
-								</select></label
-							>
+						<div class="task-title">
+							<h2>{{ task.name }}</h2>
+							<span class="pill">{{ task.status }}</span>
 						</div>
-						<div class="form-grid">
-							<label
-								>Finish by<select v-model="highway.endMode">
-									<option value="length">Road length</option>
-									<option value="endpoint">Exact endpoint coordinate</option>
-								</select></label
-							><label v-if="highway.endMode === 'length'"
-								>Length<input
-									v-model="highway.length"
-									type="number"
-									min="16"
-									max="100000"
-									required /></label
-							><label v-else
-								>End {{ ['East', 'West'].includes(highway.direction) ? 'X' : 'Z'
-								}}<input v-model="highway.endpoint" type="number" step="1" required
-							/></label>
-						</div>
-						<p class="notice">
-							{{
-								endpoint.error ||
-								`Finish at ${endpoint.x}, ${endpoint.y}, ${endpoint.z} · ${endpoint.length} road blocks`
-							}}
-						</p>
-						<div class="form-grid">
-							<label
-								>Width<input
-									v-model="highway.width"
-									type="number"
-									min="1"
-									max="5"
-									required /></label
-							><label
-								>Height<input
-									v-model="highway.height"
-									type="number"
-									min="1"
-									max="7"
-									required /></label
-							><label
-								>Vanilla Speed (blocks/sec)<input
-									v-model="highway.speed"
-									type="number"
-									min="0.1"
-									max="10"
-									step="any"
-									required /></label
-							><label
-								>Work sharing<select v-model="highway.sharing">
-									<option>Lanes</option>
-									<option>BreakOrder</option>
-								</select></label
-							>
-						</div>
-						<label>Paving material IDs<input v-model="highway.material" required /></label
-						><label
-							>Floor<select v-model="highway.floor">
-								<option>Replace</option>
-								<option>PlaceMissing</option>
-							</select></label
+						<p>{{ crewLabel(task.crew) }} · {{ task.server }} · Priority {{ task.priority }}</p>
+						<p>{{ task.detail || 'Awaiting workflow state' }}</p>
+						<template v-if="task.nativeDefinition"
+							><progress
+								:max="task.nativeDefinition.length"
+								:value="task.highwayProgress || 0"
+							></progress>
+							<p>
+								{{ task.highwayProgress || 0 }} / {{ task.nativeDefinition.length }} road blocks
+							</p></template
 						>
+						<p v-if="task.cleanupPending" class="notice">
+							Cancellation is already final. Waiting for worker cleanup/recovery acknowledgments;
+							offline workers receive cancellation when they reconnect.
+						</p>
 						<div class="actions">
-							<label><input v-model="highway.railings" type="checkbox" /> Railings</label
-							><label><input v-model="highway.above" type="checkbox" /> Mine above railings</label
-							><label><input v-model="highway.supports" type="checkbox" /> Supports</label
-							><label
-								><input v-model="highway.keepShulkers" type="checkbox" /> Keep empty/useless
-								shulkers</label
+							<template v-if="!jobHistory"
+								><button
+									:disabled="
+										!canControl || ['Complete', 'Cancelled', 'Failed'].includes(task.status)
+									"
+									@click="taskAction(task, 'pause')"
+								>
+									Pause</button
+								><button
+									:disabled="
+										!canControl || ['Complete', 'Cancelled', 'Failed'].includes(task.status)
+									"
+									@click="taskAction(task, 'resume')"
+								>
+									Resume / retry</button
+								><button
+									:disabled="
+										!canControl || ['Complete', 'Cancelled', 'Failed'].includes(task.status)
+									"
+									@click="taskAction(task, 'cancel')"
+								>
+									Cancel</button
+								><button
+									v-if="
+										task.nativeDefinition &&
+										!task.cleanupPending &&
+										!task.cancelled &&
+										host.operationsVersion
+									"
+									:disabled="!canControl"
+									@click="action(() => releaseJob(task))"
+								>
+									Release crew · keep job</button
+								><button :disabled="!canControl" @click="priority(task)">Priority</button></template
+							><template v-else
+								><button
+									v-if="
+										task.nativeDefinition &&
+										(task.highwayProgress || 0) < task.nativeDefinition.length
+									"
+									:disabled="!canControl || task.cleanupPending || !host.operationsVersion"
+									@click="action(() => continueHighway(task))"
+								>
+									Continue from verified checkpoint</button
+								><button
+									:disabled="!canControl || task.cleanupPending"
+									@click="taskAction(task, 'delete')"
+								>
+									Delete history
+								</button></template
 							>
 						</div>
-						<details open>
-							<summary>Inventory targets &amp; building rates</summary>
-							<div class="form-grid">
-								<label v-for="key in ['paving', 'picks', 'food', 'filler']" :key="key"
-									>{{ key }} target<input
-										v-model="highway[key]"
-										type="number"
-										:min="inventoryLimits[key][0]"
-										:max="inventoryLimits[key][1]"
-										required /></label
-								><label
-									>Pave ahead<input
-										v-model="highway.paveAhead"
-										type="number"
-										min="1"
-										max="5"
-										required /></label
-								><label
-									>Break ahead<input
-										v-model="highway.breakAhead"
-										type="number"
-										min="1"
-										max="5"
-										required /></label
-								><label
-									>Placements per tick<input
-										v-model="highway.placementRate"
-										type="number"
-										min="1"
-										max="20"
-										required /></label
-								><label
-									>Breaks per tick<input
-										v-model="highway.breakRate"
-										type="number"
-										min="1"
-										max="20"
-										required
-								/></label>
+						<details>
+							<summary>Worker acknowledgments &amp; checkpoints</summary>
+							<div v-for="(run, id) in task.runs" :key="id" class="operation-row">
+								<strong>{{ workerName(id) }} · {{ run.status }}</strong>
+								<p>{{ run.detail || 'No blocker reported' }}</p>
+								<small
+									>Action {{ run.action?.type || 'Between steps / queued' }} · effective priority
+									{{ task.overrides?.[id] ?? task.priority }}</small
+								><button v-if="!jobHistory" :disabled="!canControl" @click="priority(task, id)">
+									Worker priority
+								</button>
+								<pre>{{ JSON.stringify(run, null, 2) }}</pre>
 							</div>
+							<pre>{{ JSON.stringify(task, null, 2) }}</pre>
 						</details>
-						<p class="hint">
-							The form overrides speed, shulker retention and building rates in captured profiles.
-							Other captured settings are preserved. Built-in templates do not include your
-							combat/eating/tool configuration; import a client capture for synchronized settings.
-						</p>
-					</template>
-					<div v-else-if="workflow?.entry === 'task-travel'" class="form-grid">
-						<label v-for="axis in ['x', 'y', 'z']" :key="axis"
-							>Destination {{ axis.toUpperCase()
-							}}<input v-model="common[axis]" type="number" step="1" required /></label
-						><label
-							>Arrival radius<input v-model="common.radius" type="number" min="1" max="8" required
-						/></label>
+					</article>
+				</section>
+			</template>
+			<dialog ref="dialog" class="dispatch-dialog">
+				<form @submit.prevent="dispatch">
+					<div class="task-title">
+						<h2>{{ draftId ? 'Edit unassigned job' : 'Create job' }}</h2>
+						<button type="button" @click="dialog.close()">Close</button>
 					</div>
-					<div v-else-if="workflow?.entry === 'task-tpa'" class="form-grid">
-						<label
-							>TPA target<input v-model="common.target" list="bot-targets" required /><datalist
-								id="bot-targets"
+					<fieldset :disabled="busy || !!pending">
+						<label>Job name<input v-model="job.name" maxlength="48" required /></label>
+						<label v-if="!draftId"
+							>Workflow<select
+								v-model="workflowId"
+								@change="action(() => loadWorkflow(workflowId))"
 							>
-								<option
-									v-for="w in workers().filter((w) => w.crew === job.crew)"
-									:key="w.id"
-									:value="w.name"
-								/></datalist></label
-						><label
-							>Warmup ticks<input
-								v-model="common.warmupTicks"
-								type="number"
-								min="0"
-								max="1200"
-								required /></label
-						><label
-							>Timeout ticks<input
-								v-model="common.timeoutTicks"
-								type="number"
-								min="20"
-								max="72000"
-								required /></label
-						><label
-							>Arrival radius<input v-model="common.radius" type="number" min="1" max="16" required
-						/></label>
-						<p class="hint">
-							20 ticks ≈ one second. Success requires observed arrival, not just expiration of the
-							warmup.
-						</p>
-					</div>
-					<div v-else-if="workflow?.entry === 'task-drop'" class="form-grid">
-						<label>Item ID<input v-model="common.item" required /></label
-						><label
-							>Count<input
-								v-model="common.count"
-								type="number"
-								min="1"
-								max="2304"
-								required /></label
-						><label
-							>Recipient (optional)<select v-model="common.recipient">
-								<option value="">Drop locally</option>
-								<option
-									v-for="w in workers().filter((w) => w.crew === job.crew)"
-									:key="w.id"
-									:value="w.id"
-								>
-									{{ w.name }}
+								<option v-for="w in host?.workflows" :key="w.id" :value="w.id">
+									{{ w.folder }} / {{ w.name }}
 								</option>
 							</select></label
 						>
-						<p class="notice">
-							This drops real inventory items. Review the resource, quantity and recipient before
-							starting.
-						</p>
-					</div>
-					<label v-else-if="workflow?.entry === 'task-wait'"
-						>Wait ticks<input v-model="common.ticks" type="number" min="1" max="72000" required
-					/></label>
-					<label v-else-if="workflow?.entry === 'task-profile'"
-						>Captured gameplay profile<select v-model="common.profile">
-							<option v-for="(_, name) in workflow.profiles" :key="name">{{ name }}</option>
-						</select></label
-					>
-					<label v-else
-						>Workflow arguments (JSON)<textarea
-							v-model="job.args"
-							rows="5"
-							required
-							spellcheck="false"
-						></textarea>
-					</label>
-					<div class="form-grid">
-						<label>Server<input v-model="job.server" required /></label
-						><label>Dimension<input v-model="job.dimension" required /></label
-						><label
-							>Priority<input v-model="job.priority" type="number" min="-1000" max="1000" required
+						<template v-if="jobType === 'Highway'">
+							<div class="form-grid">
+								<label v-for="axis in ['x', 'y', 'z']" :key="axis"
+									>Origin {{ axis.toUpperCase()
+									}}<input v-model="highway[axis]" type="number" step="1" required /></label
+								><label
+									>Direction<select v-model="highway.direction">
+										<option v-for="(_, direction) in directions" :key="direction">
+											{{ direction }}
+										</option>
+									</select></label
+								>
+							</div>
+							<div class="form-grid">
+								<label
+									>Finish by<select v-model="highway.endMode">
+										<option value="length">Road length</option>
+										<option value="endpoint">Exact endpoint coordinate</option>
+									</select></label
+								><label v-if="highway.endMode === 'length'"
+									>Length<input
+										v-model="highway.length"
+										type="number"
+										min="16"
+										max="100000"
+										required /></label
+								><label v-else
+									>End {{ ['East', 'West'].includes(highway.direction) ? 'X' : 'Z'
+									}}<input v-model="highway.endpoint" type="number" step="1" required
+								/></label>
+							</div>
+							<p class="notice">
+								{{
+									endpoint.error ||
+									`Finish at ${endpoint.x}, ${endpoint.y}, ${endpoint.z} · ${endpoint.length} road blocks`
+								}}
+							</p>
+							<div class="form-grid">
+								<label
+									>Width<input
+										v-model="highway.width"
+										type="number"
+										min="1"
+										max="5"
+										required /></label
+								><label
+									>Height<input
+										v-model="highway.height"
+										type="number"
+										min="1"
+										max="7"
+										required /></label
+								><label
+									>Vanilla Speed (blocks/sec)<input
+										v-model="highway.speed"
+										type="number"
+										min="0.1"
+										max="10"
+										step="any"
+										required /></label
+								><label
+									>Work sharing<select v-model="highway.sharing">
+										<option>Lanes</option>
+										<option>BreakOrder</option>
+									</select></label
+								>
+							</div>
+							<label>Paving material IDs<input v-model="highway.material" required /></label
+							><label
+								>Floor<select v-model="highway.floor">
+									<option>Replace</option>
+									<option>PlaceMissing</option>
+								</select></label
+							>
+							<div class="actions">
+								<label><input v-model="highway.railings" type="checkbox" /> Railings</label
+								><label><input v-model="highway.above" type="checkbox" /> Mine above railings</label
+								><label><input v-model="highway.supports" type="checkbox" /> Supports</label
+								><label
+									><input v-model="highway.keepShulkers" type="checkbox" /> Keep empty/useless
+									shulkers</label
+								>
+							</div>
+							<details open>
+								<summary>Inventory targets &amp; building rates</summary>
+								<div class="form-grid">
+									<label v-for="key in ['paving', 'picks', 'food', 'filler']" :key="key"
+										>{{ key }} target<input
+											v-model="highway[key]"
+											type="number"
+											:min="inventoryLimits[key][0]"
+											:max="inventoryLimits[key][1]"
+											required /></label
+									><label
+										>Pave ahead<input
+											v-model="highway.paveAhead"
+											type="number"
+											min="1"
+											max="5"
+											required /></label
+									><label
+										>Break ahead<input
+											v-model="highway.breakAhead"
+											type="number"
+											min="1"
+											max="5"
+											required /></label
+									><label
+										>Placements per tick<input
+											v-model="highway.placementRate"
+											type="number"
+											min="1"
+											max="20"
+											required /></label
+									><label
+										>Breaks per tick<input
+											v-model="highway.breakRate"
+											type="number"
+											min="1"
+											max="20"
+											required
+									/></label>
+								</div>
+							</details>
+							<p class="hint">
+								The form overrides speed, shulker retention and building rates in captured profiles.
+								Other captured settings are preserved. Built-in templates do not include your
+								combat/eating/tool configuration; import a client capture for synchronized settings.
+							</p>
+						</template>
+						<div v-else-if="workflow?.entry === 'task-travel'" class="form-grid">
+							<label v-for="axis in ['x', 'y', 'z']" :key="axis"
+								>Destination {{ axis.toUpperCase()
+								}}<input v-model="common[axis]" type="number" step="1" required /></label
+							><label
+								>Arrival radius<input
+									v-model="common.radius"
+									type="number"
+									min="1"
+									max="8"
+									required
+							/></label>
+						</div>
+						<div v-else-if="workflow?.entry === 'task-tpa'" class="form-grid">
+							<label
+								>TPA target<input v-model="common.target" list="bot-targets" required /><datalist
+									id="bot-targets"
+								>
+									<option
+										v-for="w in workers().filter((w) => w.crew === job.crew)"
+										:key="w.id"
+										:value="w.name"
+									/></datalist></label
+							><label
+								>Warmup ticks<input
+									v-model="common.warmupTicks"
+									type="number"
+									min="0"
+									max="1200"
+									required /></label
+							><label
+								>Timeout ticks<input
+									v-model="common.timeoutTicks"
+									type="number"
+									min="20"
+									max="72000"
+									required /></label
+							><label
+								>Arrival radius<input
+									v-model="common.radius"
+									type="number"
+									min="1"
+									max="16"
+									required
+							/></label>
+							<p class="hint">
+								20 ticks ≈ one second. Success requires observed arrival, not just expiration of the
+								warmup.
+							</p>
+						</div>
+						<div v-else-if="workflow?.entry === 'task-drop'" class="form-grid">
+							<label>Item ID<input v-model="common.item" required /></label
+							><label
+								>Count<input
+									v-model="common.count"
+									type="number"
+									min="1"
+									max="2304"
+									required /></label
+							><label
+								>Recipient (optional)<select v-model="common.recipient">
+									<option value="">Drop locally</option>
+									<option
+										v-for="w in workers().filter((w) => w.crew === job.crew)"
+										:key="w.id"
+										:value="w.id"
+									>
+										{{ w.name }}
+									</option>
+								</select></label
+							>
+							<p class="notice">
+								This drops real inventory items. Review the resource, quantity and recipient before
+								starting.
+							</p>
+						</div>
+						<label v-else-if="workflow?.entry === 'task-wait'"
+							>Wait ticks<input v-model="common.ticks" type="number" min="1" max="72000" required
 						/></label>
-					</div>
-					<details>
-						<summary>Captured profile preview</summary>
-						<pre>{{ JSON.stringify(workflow?.profiles, null, 2) }}</pre>
-					</details>
-					<label
-						>Crew (for Start now)<select v-model="job.crew" @change="pickCrew(job.crew)">
-							<option v-for="crew in host?.crews" :key="crew" :value="crew">
-								{{ crewLabel(crew) }}
-							</option>
-						</select></label
-					>
-					<label
-						v-for="w in workers().filter((w) => w.crew === job.crew)"
-						:key="w.id"
-						class="worker-choice"
-						><input v-model="selected" type="checkbox" :value="w.id" :disabled="!w.reconciled" />{{
-							w.name
-						}}
-						{{ w.reconciled ? '' : '· reconciling' }}</label
-					>
-				</fieldset>
-				<p v-if="pending" class="notice">
-					Response unconfirmed. Retry uses the same job ID and unchanged request; inspect Jobs
-					before submitting replacement work.
-				</p>
-				<div class="actions">
-					<button class="gold" :disabled="!canControl">
-						{{ pending ? 'Retry same request' : 'Start now' }}</button
-					><button type="button" :disabled="!canControl || !!pending" @click="action(saveDraft)">
-						Save unassigned job
-					</button>
-				</div>
-			</form>
-		</dialog>
-		<dialog ref="assignmentDialog" class="dispatch-dialog">
-			<form @submit.prevent="action(dispatchDraft)">
-				<div class="task-title">
-					<h2>Assign crew</h2>
-					<button type="button" @click="assignmentDialog.close()">Close</button>
-				</div>
-				<fieldset :disabled="busy || !!pending">
-					<label
-						>Crew<select v-model="job.crew" @change="pickCrew(job.crew)">
-							<option v-for="crew in host?.crews" :key="crew" :value="crew">
-								{{ crewLabel(crew) }}
-							</option>
-						</select></label
-					><label
-						>Unclaimed unfinished job<select v-model="assignmentId" required>
-							<option value="" disabled>Choose a saved job</option>
-							<option v-for="d in draftJobs" :key="d.id" :value="d.id">
-								{{ d.name }} · {{ d.server }}
-							</option>
-						</select></label
-					>
-					<p v-if="!draftJobs.length" class="hint">Create a job and save it unassigned first.</p>
-					<label v-for="w in workers().filter((w) => w.crew === job.crew)" :key="w.id"
-						><input v-model="selected" type="checkbox" :value="w.id" :disabled="!w.reconciled" />
-						{{ w.name }}</label
-					>
-				</fieldset>
-				<p v-if="pending" class="notice">Retry retains the same immutable assignment request.</p>
-				<button class="gold" :disabled="!canControl">
-					{{ pending ? 'Retry same assignment' : 'Assign and start' }}
-				</button>
-			</form>
-		</dialog>
-		<dialog ref="workflowDialog" class="dispatch-dialog">
-			<form v-if="editor" @submit.prevent="action(saveEditor)">
-				<div class="task-title">
-					<h2>{{ editor.builtin ? 'Customize a copy' : 'Edit workflow' }}</h2>
-					<button type="button" @click="workflowDialog.close()">Close</button>
-				</div>
-				<fieldset :disabled="busy">
-					<label>Name<input v-model="editor.name" maxlength="48" required /></label
-					><label>Folder<input v-model="editor.folder" maxlength="96" required /></label
-					><label
-						>Program<select v-model="editorEntry" @change="action(changeEditorEntry)">
-							<option v-for="(_, id) in editor.package.programs" :key="id">{{ id }}</option>
-						</select></label
-					><label
-						>Lua source<textarea
-							v-model="editorScript"
-							rows="12"
-							spellcheck="false"
-							required
-						></textarea>
-					</label>
-					<details>
-						<summary>Advanced package: nested workflows, native duties, captured profiles</summary>
-						<p class="hint">
-							Edit the portable JSON package. Lua source above replaces the selected program when
-							saving. Native action lists and dependencies remain validated by the shared core.
-						</p>
-						<textarea v-model="editorPackage" rows="14" spellcheck="false" required></textarea>
-					</details>
-					<p class="hint">
-						Edits only affect future assignments. Native presets can include Excavating, Paving and
-						supply fallback; nested programs and profiles travel in this package.
+						<label v-else-if="workflow?.entry === 'task-profile'"
+							>Captured gameplay profile<select v-model="common.profile">
+								<option v-for="(_, name) in workflow.profiles" :key="name">{{ name }}</option>
+							</select></label
+						>
+						<label v-else
+							>Workflow arguments (JSON)<textarea
+								v-model="job.args"
+								rows="5"
+								required
+								spellcheck="false"
+							></textarea>
+						</label>
+						<div class="form-grid">
+							<label>Server<input v-model="job.server" required /></label
+							><label>Dimension<input v-model="job.dimension" required /></label
+							><label
+								>Priority<input
+									v-model="job.priority"
+									type="number"
+									min="-1000"
+									max="1000"
+									required
+							/></label>
+						</div>
+						<details>
+							<summary>Captured profile preview</summary>
+							<pre>{{ JSON.stringify(workflow?.profiles, null, 2) }}</pre>
+						</details>
+						<label
+							>Crew (for Start now)<select v-model="job.crew" @change="pickCrew(job.crew)">
+								<option v-for="crew in host?.crews" :key="crew" :value="crew">
+									{{ crewLabel(crew) }}
+								</option>
+							</select></label
+						>
+						<label
+							v-for="w in workers().filter((w) => w.crew === job.crew)"
+							:key="w.id"
+							class="worker-choice"
+							><input
+								v-model="selected"
+								type="checkbox"
+								:value="w.id"
+								:disabled="!w.reconciled"
+							/>{{ w.name }} {{ w.reconciled ? '' : '· reconciling' }}</label
+						>
+					</fieldset>
+					<p v-if="pending" class="notice">
+						Response unconfirmed. Retry uses the same job ID and unchanged request; inspect Jobs
+						before submitting replacement work.
 					</p>
-				</fieldset>
-				<button class="gold" :disabled="!canControl">
-					{{ editor.builtin ? 'Save as editable copy' : 'Save workflow' }}
-				</button>
-			</form>
-		</dialog>
+					<div class="actions">
+						<button class="gold" :disabled="!canControl">
+							{{ pending ? 'Retry same request' : 'Start now' }}</button
+						><button type="button" :disabled="!canControl || !!pending" @click="action(saveDraft)">
+							Save unassigned job
+						</button>
+					</div>
+				</form>
+			</dialog>
+			<dialog ref="assignmentDialog" class="dispatch-dialog">
+				<form @submit.prevent="action(dispatchDraft)">
+					<div class="task-title">
+						<h2>Assign crew</h2>
+						<button type="button" @click="assignmentDialog.close()">Close</button>
+					</div>
+					<fieldset :disabled="busy || !!pending">
+						<label
+							>Crew<select v-model="job.crew" @change="pickCrew(job.crew)">
+								<option v-for="crew in host?.crews" :key="crew" :value="crew">
+									{{ crewLabel(crew) }}
+								</option>
+							</select></label
+						><label
+							>Unclaimed unfinished job<select v-model="assignmentId" required>
+								<option value="" disabled>Choose a saved job</option>
+								<option v-for="d in draftJobs" :key="d.id" :value="d.id">
+									{{ d.name }} · {{ d.server }}
+								</option>
+							</select></label
+						>
+						<p v-if="!draftJobs.length" class="hint">Create a job and save it unassigned first.</p>
+						<label v-for="w in workers().filter((w) => w.crew === job.crew)" :key="w.id"
+							><input v-model="selected" type="checkbox" :value="w.id" :disabled="!w.reconciled" />
+							{{ w.name }}</label
+						>
+					</fieldset>
+					<p v-if="pending" class="notice">Retry retains the same immutable assignment request.</p>
+					<button class="gold" :disabled="!canControl">
+						{{ pending ? 'Retry same assignment' : 'Assign and start' }}
+					</button>
+				</form>
+			</dialog>
+			<dialog ref="workflowDialog" class="dispatch-dialog">
+				<form v-if="editor" @submit.prevent="action(saveEditor)">
+					<div class="task-title">
+						<h2>{{ editor.builtin ? 'Customize a copy' : 'Edit workflow' }}</h2>
+						<button type="button" @click="workflowDialog.close()">Close</button>
+					</div>
+					<fieldset :disabled="busy">
+						<label>Name<input v-model="editor.name" maxlength="48" required /></label
+						><label>Folder<input v-model="editor.folder" maxlength="96" required /></label
+						><label
+							>Program<select v-model="editorEntry" @change="action(changeEditorEntry)">
+								<option v-for="(_, id) in editor.package.programs" :key="id">{{ id }}</option>
+							</select></label
+						><label
+							>Lua source<textarea
+								v-model="editorScript"
+								rows="12"
+								spellcheck="false"
+								required
+							></textarea>
+						</label>
+						<details>
+							<summary>
+								Advanced package: nested workflows, native duties, captured profiles
+							</summary>
+							<p class="hint">
+								Edit the portable JSON package. Lua source above replaces the selected program when
+								saving. Native action lists and dependencies remain validated by the shared core.
+							</p>
+							<textarea v-model="editorPackage" rows="14" spellcheck="false" required></textarea>
+						</details>
+						<p class="hint">
+							Edits only affect future assignments. Native presets can include Excavating, Paving
+							and supply fallback; nested programs and profiles travel in this package.
+						</p>
+					</fieldset>
+					<button class="gold" :disabled="!canControl">
+						{{ editor.builtin ? 'Save as editable copy' : 'Save workflow' }}
+					</button>
+				</form>
+			</dialog>
+		</main>
 	</div>
 </template>
 
 <style scoped>
 .control-room {
-	padding: 2rem;
+	--surface-1: #101716;
+	--surface-2: #161e1c;
+	--surface-3: #1c2622;
+	--surface-4: #2b3530;
+	--surface-5: #536056;
+	--color-bg: var(--surface-1);
+	--color-raised-bg: var(--surface-2);
+	--color-button-bg: var(--surface-3);
+	--color-primary: #b7c3bb;
+	--color-contrast: #e9eee9;
+	color-scheme: dark;
 	color: var(--color-primary);
+	display: grid;
+	grid-template-columns: 196px minmax(0, 1fr);
+	min-height: calc(100vh - var(--top-bar-height, 48px));
+	background: radial-gradient(ellipse at 80% 0, #b59b5810, transparent 40%), var(--surface-1);
+}
+.command-rail {
+	border-right: 1px solid var(--surface-4);
+	background: #111916;
+	padding: 26px 12px 18px;
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+	align-self: stretch;
+}
+.rail-brand {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	margin: 0 7px 37px;
+	color: #e8ddbc;
+	font-weight: 650;
+	letter-spacing: 0.17em;
+	font-size: 0.8rem;
+}
+.rail-brand img {
+	width: 34px;
+	height: 34px;
+	object-fit: contain;
+}
+.rail-brand small {
+	display: block;
+	font-size: 0.48rem;
+	letter-spacing: 0.14em;
+	margin-top: 5px;
+	color: #93a398;
+}
+.rail-label {
+	color: #819187;
+	font-size: 0.55rem;
+	letter-spacing: 0.16em;
+	margin: 0 12px 10px;
+}
+.command-rail > button {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+	text-align: left;
+	border: 1px solid transparent;
+	border-radius: 8px;
+	background: transparent;
+	padding: 12px;
+	font-size: 0.8rem;
+	color: #acb9af;
+}
+.command-rail > button small {
+	display: block;
+	color: #8c9b90;
+	font-size: 0.57rem;
+	margin-top: 5px;
+}
+.command-rail > button.active {
+	color: #f1d89e;
+	background: linear-gradient(105deg, #d8b76d15, #d8b76d05);
+	border-color: #d8b76d30;
+}
+.nav-mark {
+	width: 17px;
+	text-align: center;
+	font-size: 1.1rem;
+}
+.rail-footer {
+	margin: auto 8px 0;
+	padding-top: 50px;
+	font-size: 0.65rem;
+	color: #b6c6bb;
+}
+.rail-footer small {
+	display: block;
+	margin-top: 9px;
+	color: #88998d;
+	font-size: 0.57rem;
+}
+.connection-dot {
+	display: inline-block;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: #6e776f;
+	margin-right: 7px;
+}
+.connection-dot.online {
+	background: #88d6b2;
+}
+.command-main {
+	padding: 30px;
+	min-width: 0;
+	max-width: 1720px;
+	width: 100%;
+	box-sizing: border-box;
+}
+.mobile-sections {
+	display: none;
+}
+.workspace-context {
+	font-size: 0.72rem;
+	color: #93a397;
+}
+.hero > div > p:last-child {
+	color: #9eada2;
+	font-size: 0.8rem;
+	line-height: 1.6;
+	margin: 0;
+}
+.hero > .pill {
+	font-size: 0.64rem;
+	background: #161f1a;
+}
+.control-room .hero h1 {
+	font-size: clamp(1.7rem, 2.5vw, 2.35rem);
+	letter-spacing: -0.045em;
+	font-weight: 550;
+	margin: 12px 0 9px;
+}
+.control-room .hero {
+	padding-bottom: 6px;
+}
+.control-room .toolbar {
+	margin: 18px 0 22px;
+}
+.control-room .panel {
+	border-color: var(--surface-4);
+	background: var(--surface-2);
+	border-radius: 12px;
+}
+.control-room button.gold {
+	background: linear-gradient(115deg, #ba9a5e, #ebd19a);
+	border: 1px solid #e2c68b;
+	box-shadow:
+		inset 0 1px #fff4,
+		0 3px 12px #0002;
+	font-size: 0.75rem;
+}
+.control-room .dispatch-dialog {
+	background: var(--surface-2);
+	border-color: #9b8654;
+	box-shadow: 0 30px 100px #0008;
+}
+@media (max-width: 1000px) {
+	.control-room {
+		grid-template-columns: 66px minmax(0, 1fr);
+	}
+	.command-rail {
+		padding: 22px 8px;
+	}
+	.command-rail > button {
+		padding: 13px;
+	}
+	.command-rail > button > span:last-child,
+	.rail-brand > div,
+	.rail-label,
+	.rail-footer {
+		display: none;
+	}
+	.rail-brand {
+		margin: 0 0 26px;
+		justify-content: center;
+	}
+	.command-main {
+		padding: 22px;
+	}
+}
+@media (max-width: 650px) {
+	.control-room {
+		display: block;
+	}
+	.command-rail {
+		display: none;
+	}
+	.command-main {
+		padding: 18px 12px;
+	}
+	.mobile-sections {
+		display: flex;
+		width: 100%;
+	}
+	.mobile-sections button {
+		padding: 7px 9px;
+		font-size: 0.7rem;
+	}
 }
 .operation-row {
 	padding: 1rem 0;
@@ -1605,7 +1877,7 @@ onUnmounted(() => {
 		grid-template-columns: 1fr;
 	}
 	.control-room {
-		padding: 1rem;
+		padding: 0;
 	}
 }
 .hero,
@@ -1676,6 +1948,14 @@ nav,
 	display: flex;
 	gap: 0.5rem;
 	flex-wrap: wrap;
+}
+.mobile-sections {
+	display: none;
+}
+@media (max-width: 650px) {
+	.mobile-sections {
+		display: flex;
+	}
 }
 button {
 	border: 1px solid #d8b76d35;

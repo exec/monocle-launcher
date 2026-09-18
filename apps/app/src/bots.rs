@@ -8,6 +8,9 @@ use tauri::Manager;
 use tauri_plugin_http::reqwest;
 use tokio::sync::Mutex;
 
+mod worker_config;
+static SESSIONS: Mutex<()> = Mutex::const_new(());
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
@@ -36,6 +39,10 @@ pub struct WorkerSession {
 	pub instance: String,
 	#[serde(default)]
 	pub server: String,
+	#[serde(default)]
+	pub crew: String,
+	#[serde(default)]
+	pub template: String,
 }
 
 fn validate_sessions(sessions: &[WorkerSession]) -> Result<(), String> {
@@ -50,6 +57,9 @@ fn validate_sessions(sessions: &[WorkerSession]) -> Result<(), String> {
 			|| session.instance.is_empty() || session.instance.len() > 512
 			|| session.instance.chars().any(char::is_control)
 			|| session.server.len() > 253 || session.server.chars().any(char::is_control)
+			|| session.crew.len() > 128 || session.crew.chars().any(char::is_control)
+			|| session.template.len() > 512 || session.template.chars().any(char::is_control)
+			|| !session.template.is_empty() && session.template == session.instance
 			|| !workers.insert(session.worker)
 			|| !accounts.insert(session.account)
 			|| !instances.insert(&session.instance)
@@ -79,11 +89,24 @@ pub async fn bot_worker_sessions() -> Result<Vec<WorkerSession>, String> {
 
 #[tauri::command]
 pub async fn bot_worker_sessions_save(sessions: Vec<WorkerSession>) -> Result<(), String> {
-	static SAVE: Mutex<()> = Mutex::const_new(());
-	let _save = SAVE.lock().await;
+	let _save = SESSIONS.lock().await;
 	validate_sessions(&sessions)?;
-	let processes = theseus::process::get_all().await.map_err(|e| e.to_string())?;
 	let previous_sessions = bot_worker_sessions().await?;
+	let accounts = theseus::minecraft_auth::users().await.map_err(|e| e.to_string())?;
+	let instances = theseus::instance::list().await.map_err(|e| e.to_string())?;
+	for session in &sessions {
+		if previous_sessions.contains(session) { continue; }
+		if !accounts.iter().any(|a| a.offline_profile.id == session.account)
+			|| !instances.iter().any(|i| i.instance.id == session.instance)
+			|| !session.template.is_empty() && !instances.iter().any(|i| i.instance.id == session.template)
+		{
+			return Err("Choose an installed account, worker instance and available settings source".into());
+		}
+		if !session.crew.is_empty() && !config(&bot_host_settings().await?)?.crews.contains_key(&session.crew) {
+			return Err("The selected crew is no longer configured on this host".into());
+		}
+	}
+	let processes = theseus::process::get_all().await.map_err(|e| e.to_string())?;
 	for next in &sessions {
 		if !previous_sessions.contains(next) && processes.iter().any(|p| p.instance_id == next.instance) {
 			return Err("Stop this game before binding its account and instance".into());
@@ -99,6 +122,56 @@ pub async fn bot_worker_sessions_save(sessions: Vec<WorkerSession>) -> Result<()
 	fs::write(&temporary, serde_json::to_vec(&sessions).map_err(|e| e.to_string())?)
 		.map_err(|e| e.to_string())?;
 	fs::rename(temporary, file).map_err(|e| e.to_string())
+}
+
+pub async fn launch_instance(
+	instance_id: &str,
+	quick_play: theseus::instance::QuickPlayType,
+	account: Option<uuid::Uuid>,
+) -> theseus::Result<theseus::prelude::ProcessMetadata> {
+	let _sessions = SESSIONS.lock().await;
+	let input = |message: String| theseus::Error::from(theseus::ErrorKind::InputError(message));
+	let binding = bot_worker_sessions().await.map_err(input)?.into_iter().find(|s| s.instance == instance_id);
+	let selected = binding.as_ref().map(|s| s.account).or(account);
+	if let (Some(binding), Some(account)) = (&binding, account) {
+		if binding.account != account {
+			return Err(input("This worker instance is bound to a different account. Change its binding while stopped.".into()));
+		}
+	}
+	theseus::instance::run_prepared(instance_id, quick_play, selected, async {
+		if let Some(binding) = binding {
+			prepare_worker(&binding).await.map_err(input)?;
+		}
+		Ok(())
+	}).await
+}
+
+async fn prepare_worker(session: &WorkerSession) -> Result<(), String> {
+	if session.crew.is_empty() && session.template.is_empty() { return Ok(()); }
+	let path = theseus::instance::get_full_path(&session.instance).await.map_err(|e| e.to_string())?;
+	let template = if session.template.is_empty() { None } else {
+		if theseus::process::get_all().await.map_err(|e| e.to_string())?.iter().any(|p| p.instance_id == session.template) {
+			return Err("Stop the settings-source instance before copying its saved configuration".into());
+		}
+		Some(theseus::instance::get_full_path(&session.template).await.map_err(|e| e.to_string())?)
+	};
+	let connection = if session.crew.is_empty() { None } else {
+		let settings = bot_host_settings().await?;
+		let cfg = config(&settings)?;
+		let snapshot = request(&settings, None).await.ok();
+		let known = snapshot.as_ref().and_then(|s| s["workers"].as_array())
+			.and_then(|workers| workers.iter().find(|w| w["id"].as_str() == Some(&session.worker.to_string())));
+		if known.is_some_and(|w| w["connected"].as_bool() == Some(true)) {
+			return Err("This worker is already connected. Stop its other session before launching locally.".into());
+		}
+		let crew = known.and_then(|w| w["crew"].as_str()).unwrap_or(&session.crew);
+		let key = cfg.crews.get(crew).ok_or("This worker's crew is missing from the selected host")?;
+		let address = match cfg.bind.as_str() { "0.0.0.0" => "127.0.0.1", "::" => "::1", bind => bind }.to_string();
+		Some((address, cfg.worker_port, key.clone()))
+	};
+	let note = worker_config::prepare(&path, template.as_deref(), connection.as_ref().map(|(address, port, key)| (address.as_str(), *port, key.as_str())))?;
+	tracing::info!(instance = %session.instance, "Monocle worker prepared: {note}");
+	Ok(())
 }
 
 async fn settings_file() -> Result<PathBuf, String> {
@@ -359,7 +432,7 @@ pub async fn bot_host_control(body: Value) -> Result<Value, String> {
 		Some(
 			"submit"
 				| "pause" | "resume"
-				| "cancel" | "priority"
+				| "cancel" | "priority" | "configure"
 				| "delete" | "end-highway" | "task-get" | "task-release"
 				| "workflow-list" | "workflow-get" | "workflow-save"
 				| "workflow-duplicate" | "workflow-delete"
@@ -427,7 +500,7 @@ mod tests {
 	use super::*;
 	#[test]
 	fn worker_sessions_are_unique_and_bounded() {
-		let session = WorkerSession { worker: uuid::Uuid::new_v4(), account: uuid::Uuid::new_v4(), instance: "instance-one".into(), server: String::new() };
+		let session = WorkerSession { worker: uuid::Uuid::new_v4(), account: uuid::Uuid::new_v4(), instance: "instance-one".into(), server: String::new(), crew: String::new(), template: String::new() };
 		assert!(validate_sessions(&[session.clone()]).is_ok());
 		assert!(validate_sessions(&[session.clone(), session.clone()]).is_err());
 		let mut other = session.clone();

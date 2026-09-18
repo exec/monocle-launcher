@@ -19,6 +19,7 @@ hyper-util = { workspace = true }
 image = { workspace = true, features = ["gif", "jpeg", "png", "webp"] }
 native-dialog = { workspace = true }
 paste = { workspace = true }
+quartz_nbt = { workspace = true }
 path-util = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
@@ -35,6 +36,7 @@ tauri-plugin-updater = { workspace = true }
 tauri-plugin-window-state = { workspace = true }
 theseus = { workspace = true, features = ["tauri"] }
 thiserror = { workspace = true }
+tempfile = { workspace = true }
 tokio = { workspace = true, features = ["time"] }
 tracing = { workspace = true }
 url = { workspace = true }

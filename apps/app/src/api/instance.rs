@@ -1330,10 +1330,7 @@ pub async fn instance_run(
         Some(addr) => QuickPlayType::Server(ServerAddress::Unresolved(addr)),
         None => QuickPlayType::None,
     };
-	Ok(match account {
-		Some(user) => theseus::instance::run_with_account(instance_id, quick_play, user).await?,
-		None => theseus::instance::run(instance_id, quick_play).await?,
-	})
+	Ok(crate::bots::launch_instance(instance_id, quick_play, account).await?)
 }
 
 #[tauri::command]

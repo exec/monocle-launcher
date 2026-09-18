@@ -54,6 +54,7 @@ jobs:
           node apps/app/monocle-check.mjs
           node apps/app-frontend/src/helpers/bot-operations.check.mjs
           node apps/app-frontend/src/helpers/bot-sessions.check.mjs
+          node apps/app-frontend/src/components/bot-dashboard/dashboard.check.mjs
       - name: Build frontend
         run: pnpm --filter @modrinth/app-frontend exec vite build --logLevel error
       - name: Build unsigned development installer

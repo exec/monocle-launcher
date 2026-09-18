@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict'
-import { canLaunchSession, launchSessions, sessionState } from './bot-sessions.js'
+import { canLaunchSession, launchSessions, sessionState, sessionRoster } from './bot-sessions.js'
+
+const accounts = [{ id: 'account-one', name: 'First' }, { id: 'account-two', name: 'Second' }]
+assert.equal(sessionRoster([], [], accounts).length, 2)
+const roster = sessionRoster([{ id: 'one', name: 'Remote name', connected: true }], [{ worker: 'one', account: 'account-one' }], accounts)
+assert.equal(roster.length, 2)
+assert.equal(roster[0].name, 'Remote name')
+assert.equal(roster[1].id, 'account-two')
 
 const binding = { worker: 'one', instance: 'first', account: 'account-one' }
 const running = [{ instance_id: 'first' }]

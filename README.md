@@ -26,6 +26,8 @@ New hosts default to loopback worker port 6969 and API port 6970. Set LAN bindin
 
 ## Operations console
 
+The fleet dashboard uses a graphite-and-gold command rail, live operation progress, searchable worker cards, a crew board, an attention panel and a bounded activity feed. Filter the overview by crew, inspect a worker, or pause/retry a job without leaving the dashboard. Disconnected snapshots are marked as last known and job controls are disabled. These panels use the existing host snapshots and commands; the redesign adds no worker protocol or background job behavior.
+
 **Overview / Crews / Jobs / Workflows / Workers / Settings** separates operating work from connection setup. Crews have stable identifiers and editable names; create/delete crews and move idle workers with an authenticated, sealed key update. Active queues, containers and pending cleanup block reassignment rather than orphaning work. Job history is hidden inside Jobs, with retention configurable in Settings (30 days by default).
 
 Create highway jobs with origin, direction, length or exact endpoint, width/height, work sharing, speed, inventory targets, shulker retention and speculative building rates. Save work unassigned, then **Assign crew** to claim it, or start immediately. Travel, TPA, dropping items, waiting and selecting captured profiles have typed inputs; custom workflows use JSON arguments. Pause/resume/cancel and per-worker priorities remain host-authoritative. Cleanup stays visible in active operations until acknowledged. **Release crew · keep job** retains verified highway progress as protected unassigned work; another assignment waits for cancellation and recovery to finish.
@@ -37,6 +39,8 @@ Worker observations are deduplicated and retained offline without claiming live 
 Active-job worker borrowing still uses workflow priorities, not forced crew-key changes during container recovery. Remote host attachment and managed-service ownership across launcher restarts remain future work. This build has been compiled on macOS; Windows/Linux compile and native lifecycle testing are still required before a public cross-platform release.
 
 ## Stage 3 · Worker sessions
+
+Worker execution details now include **Live gameplay settings**: Speed, AutoEat (including enchanted golden apples/named food), or a gameplay module with partial SNBT settings. Changes use the shared host `configure` operation, not local config-file replacement. Pending/applied/rejected revisions stay visible, and concurrent updates are blocked until acknowledged. Requires host and workers supporting client 0.7.50; job-owned builder geometry is intentionally excluded. Personal settings are restored on job exit.
 
 The **Workers** section binds each observed worker to a local Minecraft account and instance, with an optional server to join. Import/create an instance, install Monocle, configure its Worker connection, and connect once before binding. Bindings persist locally in `bot-worker-sessions.json`; passwords, tokens and host crew keys are not copied into that file.
 

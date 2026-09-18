@@ -24,7 +24,7 @@ pub async fn run(
     instance_id: &str,
     quick_play_type: QuickPlayType,
 ) -> crate::Result<ProcessMetadata> {
-	run_selected(instance_id, quick_play_type, None).await
+	run_prepared(instance_id, quick_play_type, None, async { Ok(()) }).await
 }
 
 pub async fn run_with_account(
@@ -32,13 +32,15 @@ pub async fn run_with_account(
 	quick_play_type: QuickPlayType,
 	account: uuid::Uuid,
 ) -> crate::Result<ProcessMetadata> {
-	run_selected(instance_id, quick_play_type, Some(account)).await
+	run_prepared(instance_id, quick_play_type, Some(account), async { Ok(()) }).await
 }
 
-async fn run_selected(
+/// Runs preparation under the same launch lock as normal launches, before spawning Minecraft.
+pub async fn run_prepared(
 	instance_id: &str,
 	quick_play_type: QuickPlayType,
 	account: Option<uuid::Uuid>,
+	prepare: impl std::future::Future<Output = crate::Result<()>>,
 ) -> crate::Result<ProcessMetadata> {
 	// ponytail: serialize launches; per-instance locks if startup throughput matters.
 	static LAUNCH: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
@@ -71,6 +73,7 @@ async fn run_selected(
 			.ok_or_else(|| crate::ErrorKind::NoCredentialsError.as_error())?,
 	};
 
+	prepare.await?;
     run_credentials(instance_id, &default_account, quick_play_type).await
 }
 

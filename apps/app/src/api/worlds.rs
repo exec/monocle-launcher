@@ -2,7 +2,7 @@ use crate::api::Result;
 use either::Either;
 use enumset::EnumSet;
 use tauri::{AppHandle, Manager, Runtime};
-use theseus::instance::{self, QuickPlayType, get_full_path};
+use theseus::instance::{QuickPlayType, get_full_path};
 use theseus::prelude::ProcessMetadata;
 use theseus::server_address::ServerAddress;
 use theseus::worlds;
@@ -237,7 +237,7 @@ pub async fn start_join_singleplayer_world(
     world: String,
 ) -> Result<ProcessMetadata> {
     let process =
-        instance::run(instance_id, QuickPlayType::Singleplayer(world)).await?;
+        crate::bots::launch_instance(instance_id, QuickPlayType::Singleplayer(world), None).await?;
 
     Ok(process)
 }
@@ -247,9 +247,10 @@ pub async fn start_join_server(
     instance_id: &str,
     address: &str,
 ) -> Result<ProcessMetadata> {
-    let process = instance::run(
+    let process = crate::bots::launch_instance(
         instance_id,
         QuickPlayType::Server(ServerAddress::Unresolved(address.to_owned())),
+		None,
     )
     .await?;
 

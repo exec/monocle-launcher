@@ -56,7 +56,9 @@ jobs:
           node apps/app-frontend/src/helpers/bot-sessions.check.mjs
           node apps/app-frontend/src/components/bot-dashboard/dashboard.check.mjs
       - name: Build frontend
-        run: pnpm --filter @modrinth/app-frontend exec vite build --logLevel error
+        run: |
+          pnpm -w i18n:coverage
+          pnpm --filter @modrinth/app-frontend exec vite build --logLevel error
       - name: Build unsigned development installer
         shell: bash
         working-directory: apps/app
